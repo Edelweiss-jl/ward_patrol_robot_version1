@@ -1,0 +1,2027 @@
+{
+  "version": "adaptive-q-v3",
+  "policy_sha256": "1d52a6bcc9fc5294beedba48071634e056ab20b004989f2481f97563583e026e",
+  "seed_start": 5000,
+  "requested_episodes": 5,
+  "max_seconds": 180,
+  "generated_at_unix": 1792480925.5273745,
+  "summary": [
+    {
+      "scenario": "corridor",
+      "people": false,
+      "controller": "astar",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 25.64,
+      "mean_par2_seconds": 25.64,
+      "mean_wall_seconds": 3.2058844599989245,
+      "mean_distance_m": 45.574799999999996,
+      "mean_wait_seconds": 0.0,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 0.0,
+      "paired_total_time_reduction_percent": 0.0,
+      "paired_faster": 0,
+      "collision_frames": 0
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "controller": "fixed",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 24.046599999999998,
+      "mean_par2_seconds": 24.046599999999998,
+      "mean_wall_seconds": 2.1583030000096186,
+      "mean_distance_m": 43.03,
+      "mean_wait_seconds": 0.0234,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 5.987748573612082,
+      "paired_total_time_reduction_percent": 6.214508580343203,
+      "paired_faster": 5,
+      "collision_frames": 0
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "controller": "short",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 24.046599999999998,
+      "mean_par2_seconds": 24.046599999999998,
+      "mean_wall_seconds": 2.266811119997874,
+      "mean_distance_m": 43.03,
+      "mean_wait_seconds": 0.0234,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 5.987748573612082,
+      "paired_total_time_reduction_percent": 6.214508580343203,
+      "paired_faster": 5,
+      "collision_frames": 0
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "controller": "adaptive",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 24.046599999999998,
+      "mean_par2_seconds": 24.046599999999998,
+      "mean_wall_seconds": 2.0943527600029483,
+      "mean_distance_m": 43.03,
+      "mean_wait_seconds": 0.0234,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 5.987748573612082,
+      "paired_total_time_reduction_percent": 6.214508580343203,
+      "paired_faster": 5,
+      "collision_frames": 0
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "controller": "astar",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 40.5234,
+      "mean_par2_seconds": 40.5234,
+      "mean_wall_seconds": 5.0545012999908066,
+      "mean_distance_m": 73.443,
+      "mean_wait_seconds": 0.1068,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 0.0,
+      "paired_total_time_reduction_percent": 0.0,
+      "paired_faster": 0,
+      "collision_frames": 0
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "controller": "fixed",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 37.0534,
+      "mean_par2_seconds": 37.0534,
+      "mean_wall_seconds": 3.4668076400179415,
+      "mean_distance_m": 67.7638,
+      "mean_wait_seconds": 0.3402,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 7.1788965111198,
+      "paired_total_time_reduction_percent": 8.562953750178902,
+      "paired_faster": 5,
+      "collision_frames": 0
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "controller": "short",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 34.086600000000004,
+      "mean_par2_seconds": 34.086600000000004,
+      "mean_wall_seconds": 3.023133279976901,
+      "mean_distance_m": 62.1472,
+      "mean_wait_seconds": 0.337,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 12.138864915543182,
+      "paired_total_time_reduction_percent": 15.884155821081148,
+      "paired_faster": 5,
+      "collision_frames": 0
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "controller": "adaptive",
+      "episodes": 5,
+      "successes": 5,
+      "success_rate": 1.0,
+      "mean_success_seconds": 38.2034,
+      "mean_par2_seconds": 38.2034,
+      "mean_wall_seconds": 4.112630040000658,
+      "mean_distance_m": 69.9598,
+      "mean_wait_seconds": 0.317,
+      "paired_successes": 5,
+      "paired_mean_time_reduction_percent": 5.2782645995874145,
+      "paired_total_time_reduction_percent": 5.725087233548997,
+      "paired_faster": 5,
+      "collision_frames": 0
+    }
+  ],
+  "episodes": [
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5000,
+      "controller": "astar",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 16.1,
+      "wall_seconds": 2.432481700030621,
+      "distance_m": 27.774,
+      "wait_seconds": 0.0,
+      "replans": 4,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5000,
+      "controller": "fixed",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.5946542999590747,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          76,
+          0,
+          0
+        ],
+        [
+          0,
+          76,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5000,
+      "controller": "short",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.715692099998705,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          76,
+          0,
+          0,
+          0
+        ],
+        [
+          76,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5000,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.439077000017278,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          76,
+          0,
+          0
+        ],
+        [
+          0,
+          76,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5001,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "88e6d8ca78e8dab0598fd5c5df4be2f8398db2b72256543f794b6ba5c05f9bf6",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S1-1",
+          "N1-1",
+          "S3-2",
+          "N3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 36.983,
+      "wall_seconds": 3.034093900001608,
+      "distance_m": 67.851,
+      "wait_seconds": 0.0,
+      "replans": 7,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          17,
+          168,
+          0,
+          0
+        ],
+        [
+          17,
+          168,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5001,
+      "controller": "short",
+      "initial_conditions_sha256": "88e6d8ca78e8dab0598fd5c5df4be2f8398db2b72256543f794b6ba5c05f9bf6",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S1-1",
+          "N1-1",
+          "S3-2",
+          "N3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 36.983,
+      "wall_seconds": 3.198400599998422,
+      "distance_m": 67.851,
+      "wait_seconds": 0.0,
+      "replans": 7,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          185,
+          0,
+          0,
+          0
+        ],
+        [
+          185,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5001,
+      "controller": "fixed",
+      "initial_conditions_sha256": "88e6d8ca78e8dab0598fd5c5df4be2f8398db2b72256543f794b6ba5c05f9bf6",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S1-1",
+          "N1-1",
+          "S3-2",
+          "N3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 36.983,
+      "wall_seconds": 3.043436500011012,
+      "distance_m": 67.851,
+      "wait_seconds": 0.0,
+      "replans": 7,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          185,
+          0,
+          0
+        ],
+        [
+          0,
+          185,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5001,
+      "controller": "astar",
+      "initial_conditions_sha256": "88e6d8ca78e8dab0598fd5c5df4be2f8398db2b72256543f794b6ba5c05f9bf6",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S1-1",
+          "N1-1",
+          "S3-2",
+          "N3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 39.367,
+      "wall_seconds": 4.651402000046801,
+      "distance_m": 71.24,
+      "wait_seconds": 0.0,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5002,
+      "controller": "astar",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 16.1,
+      "wall_seconds": 1.9556064999778755,
+      "distance_m": 27.774,
+      "wait_seconds": 0.0,
+      "replans": 4,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5002,
+      "controller": "fixed",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.457441100035794,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          76,
+          0,
+          0
+        ],
+        [
+          0,
+          76,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5002,
+      "controller": "short",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.3738816000404768,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          76,
+          0,
+          0,
+          0
+        ],
+        [
+          76,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5002,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "edccfc03d81d472dd85eb5c41827fcb467b298e46fba09bf1cbac7e6d178cd52",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S3-2",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.3674587999703363,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          76,
+          0,
+          0
+        ],
+        [
+          0,
+          76,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5003,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "be362a9fc5337a0ae921015455822a4de15593ab1a4b41f1c4812323a4b351ba",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S1-1",
+          "S3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.239104500040412,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          76,
+          0,
+          0
+        ],
+        [
+          0,
+          76,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5003,
+      "controller": "short",
+      "initial_conditions_sha256": "be362a9fc5337a0ae921015455822a4de15593ab1a4b41f1c4812323a4b351ba",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S1-1",
+          "S3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.3716234999592416,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          76,
+          0,
+          0,
+          0
+        ],
+        [
+          76,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5003,
+      "controller": "fixed",
+      "initial_conditions_sha256": "be362a9fc5337a0ae921015455822a4de15593ab1a4b41f1c4812323a4b351ba",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S1-1",
+          "S3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 15.2,
+      "wall_seconds": 1.2822094000293873,
+      "distance_m": 26.11,
+      "wait_seconds": 0.0,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          76,
+          0,
+          0
+        ],
+        [
+          0,
+          76,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5003,
+      "controller": "astar",
+      "initial_conditions_sha256": "be362a9fc5337a0ae921015455822a4de15593ab1a4b41f1c4812323a4b351ba",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "N1-1",
+          "N3-2",
+          "S1-1",
+          "S3-2"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 16.1,
+      "wall_seconds": 2.022103099967353,
+      "distance_m": 27.774,
+      "wait_seconds": 0.0,
+      "replans": 4,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5004,
+      "controller": "astar",
+      "initial_conditions_sha256": "8544a9932e081fa1ab9b9d9c688aefa4d3fd4fcb1fb8927f03eeac14c7905e13",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S3-2",
+          "N3-2",
+          "N1-1",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 40.533,
+      "wall_seconds": 4.967828999971971,
+      "distance_m": 73.312,
+      "wait_seconds": 0.0,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5004,
+      "controller": "fixed",
+      "initial_conditions_sha256": "8544a9932e081fa1ab9b9d9c688aefa4d3fd4fcb1fb8927f03eeac14c7905e13",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S3-2",
+          "N3-2",
+          "N1-1",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 37.65,
+      "wall_seconds": 3.4137737000128254,
+      "distance_m": 68.969,
+      "wait_seconds": 0.117,
+      "replans": 9,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          189,
+          0,
+          0
+        ],
+        [
+          0,
+          189,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5004,
+      "controller": "short",
+      "initial_conditions_sha256": "8544a9932e081fa1ab9b9d9c688aefa4d3fd4fcb1fb8927f03eeac14c7905e13",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S3-2",
+          "N3-2",
+          "N1-1",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 37.65,
+      "wall_seconds": 3.674457799992524,
+      "distance_m": 68.969,
+      "wait_seconds": 0.117,
+      "replans": 9,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          189,
+          0,
+          0,
+          0
+        ],
+        [
+          189,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "corridor",
+      "people": false,
+      "seed": 5004,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "8544a9932e081fa1ab9b9d9c688aefa4d3fd4fcb1fb8927f03eeac14c7905e13",
+      "initial_conditions": {
+        "scenario": "corridor",
+        "beds": [
+          "S3-2",
+          "N3-2",
+          "N1-1",
+          "S1-1"
+        ],
+        "robots": [
+          [
+            -8,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 37.65,
+      "wall_seconds": 3.392029599985108,
+      "distance_m": 68.969,
+      "wait_seconds": 0.117,
+      "replans": 9,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          21,
+          163,
+          5,
+          0
+        ],
+        [
+          21,
+          163,
+          5,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5000,
+      "controller": "astar",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 21.517,
+      "wall_seconds": 2.0884974999935366,
+      "distance_m": 38.031,
+      "wait_seconds": 0.0,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5000,
+      "controller": "fixed",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 20.6,
+      "wall_seconds": 1.3465612000436522,
+      "distance_m": 36.638999999999996,
+      "wait_seconds": 0.234,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          103,
+          0,
+          0
+        ],
+        [
+          0,
+          103,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5000,
+      "controller": "short",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 20.6,
+      "wall_seconds": 1.4729724999633618,
+      "distance_m": 36.638999999999996,
+      "wait_seconds": 0.234,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          103,
+          0,
+          0,
+          0
+        ],
+        [
+          103,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5000,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 20.6,
+      "wall_seconds": 1.4778806999674998,
+      "distance_m": 36.638999999999996,
+      "wait_seconds": 0.234,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          103,
+          0,
+          0
+        ],
+        [
+          0,
+          103,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5001,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "ff89efa6927f127c9b78179d72a9bebbb2bd4d9107ec019a0785a923c53408c3",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD1",
+          "ICU1",
+          "WARD4",
+          "ICU4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 44.7,
+      "wall_seconds": 3.7271882999921218,
+      "distance_m": 82.301,
+      "wait_seconds": 0.35000000000000003,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          224,
+          0,
+          0
+        ],
+        [
+          0,
+          224,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5001,
+      "controller": "short",
+      "initial_conditions_sha256": "ff89efa6927f127c9b78179d72a9bebbb2bd4d9107ec019a0785a923c53408c3",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD1",
+          "ICU1",
+          "WARD4",
+          "ICU4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 44.7,
+      "wall_seconds": 3.567310699960217,
+      "distance_m": 82.301,
+      "wait_seconds": 0.35000000000000003,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          224,
+          0,
+          0,
+          0
+        ],
+        [
+          224,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5001,
+      "controller": "fixed",
+      "initial_conditions_sha256": "ff89efa6927f127c9b78179d72a9bebbb2bd4d9107ec019a0785a923c53408c3",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD1",
+          "ICU1",
+          "WARD4",
+          "ICU4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 44.7,
+      "wall_seconds": 3.6806875999900512,
+      "distance_m": 82.301,
+      "wait_seconds": 0.35000000000000003,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          224,
+          0,
+          0
+        ],
+        [
+          0,
+          224,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5001,
+      "controller": "astar",
+      "initial_conditions_sha256": "ff89efa6927f127c9b78179d72a9bebbb2bd4d9107ec019a0785a923c53408c3",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD1",
+          "ICU1",
+          "WARD4",
+          "ICU4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 46.833,
+      "wall_seconds": 5.6343626999878325,
+      "distance_m": 85.38499999999999,
+      "wait_seconds": 0.0,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5002,
+      "controller": "astar",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 21.517,
+      "wall_seconds": 2.1159999999799766,
+      "distance_m": 38.031,
+      "wait_seconds": 0.0,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5002,
+      "controller": "fixed",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 20.6,
+      "wall_seconds": 1.445671699999366,
+      "distance_m": 36.638999999999996,
+      "wait_seconds": 0.234,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          103,
+          0,
+          0
+        ],
+        [
+          0,
+          103,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5002,
+      "controller": "short",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 20.6,
+      "wall_seconds": 1.3437242999789305,
+      "distance_m": 36.638999999999996,
+      "wait_seconds": 0.234,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          103,
+          0,
+          0,
+          0
+        ],
+        [
+          103,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5002,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "8af01591445dcffca32e741bb3d7935e398a9c7fade43677c1815d28af6e6ca5",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD4",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 20.6,
+      "wall_seconds": 1.4836875000037253,
+      "distance_m": 36.638999999999996,
+      "wait_seconds": 0.234,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          103,
+          0,
+          0
+        ],
+        [
+          0,
+          103,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5003,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "db96b0cea5b091322a9ebc9291526f4e9f7d0c223fd949e7eb9f0b793f7bebd8",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD1",
+          "WARD4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 54.95,
+      "wall_seconds": 9.296938400017098,
+      "distance_m": 101.582,
+      "wait_seconds": 0.384,
+      "replans": 22,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          48,
+          227,
+          0,
+          0
+        ],
+        [
+          48,
+          227,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5003,
+      "controller": "short",
+      "initial_conditions_sha256": "db96b0cea5b091322a9ebc9291526f4e9f7d0c223fd949e7eb9f0b793f7bebd8",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD1",
+          "WARD4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 34.35,
+      "wall_seconds": 3.8863949999795295,
+      "distance_m": 62.604,
+      "wait_seconds": 0.384,
+      "replans": 6,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          172,
+          0,
+          0,
+          0
+        ],
+        [
+          172,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5003,
+      "controller": "fixed",
+      "initial_conditions_sha256": "db96b0cea5b091322a9ebc9291526f4e9f7d0c223fd949e7eb9f0b793f7bebd8",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD1",
+          "WARD4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 48.85,
+      "wall_seconds": 5.894143600016832,
+      "distance_m": 90.209,
+      "wait_seconds": 0.30000000000000004,
+      "replans": 18,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          245,
+          0,
+          0
+        ],
+        [
+          0,
+          245,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5003,
+      "controller": "astar",
+      "initial_conditions_sha256": "db96b0cea5b091322a9ebc9291526f4e9f7d0c223fd949e7eb9f0b793f7bebd8",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "ICU1",
+          "ICU4",
+          "WARD1",
+          "WARD4"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 60.0,
+      "wall_seconds": 8.448607500002254,
+      "distance_m": 109.471,
+      "wait_seconds": 0.534,
+      "replans": 14,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5004,
+      "controller": "astar",
+      "initial_conditions_sha256": "2d1bd4e596cd96db32b1b3343312eeac90fe042754ec6bf8d95963a4d1be0cc4",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD4",
+          "ICU4",
+          "ICU1",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 52.75,
+      "wall_seconds": 6.985038799990434,
+      "distance_m": 96.297,
+      "wait_seconds": 0.0,
+      "replans": 5,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": null
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5004,
+      "controller": "fixed",
+      "initial_conditions_sha256": "2d1bd4e596cd96db32b1b3343312eeac90fe042754ec6bf8d95963a4d1be0cc4",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD4",
+          "ICU4",
+          "ICU1",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 50.517,
+      "wall_seconds": 4.966974100039806,
+      "distance_m": 93.031,
+      "wait_seconds": 0.583,
+      "replans": 8,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          0,
+          253,
+          0,
+          0
+        ],
+        [
+          0,
+          253,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5004,
+      "controller": "short",
+      "initial_conditions_sha256": "2d1bd4e596cd96db32b1b3343312eeac90fe042754ec6bf8d95963a4d1be0cc4",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD4",
+          "ICU4",
+          "ICU1",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 50.183,
+      "wall_seconds": 4.845263900002465,
+      "distance_m": 92.553,
+      "wait_seconds": 0.483,
+      "replans": 8,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          251,
+          0,
+          0,
+          0
+        ],
+        [
+          251,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "scenario": "ring",
+      "people": false,
+      "seed": 5004,
+      "controller": "adaptive",
+      "initial_conditions_sha256": "2d1bd4e596cd96db32b1b3343312eeac90fe042754ec6bf8d95963a4d1be0cc4",
+      "initial_conditions": {
+        "scenario": "ring",
+        "beds": [
+          "WARD4",
+          "ICU4",
+          "ICU1",
+          "WARD1"
+        ],
+        "robots": [
+          [
+            -9.5,
+            0
+          ],
+          [
+            9.5,
+            0
+          ]
+        ],
+        "people": []
+      },
+      "success": true,
+      "completed_tasks": 4,
+      "seconds": 50.167,
+      "wall_seconds": 4.577455300022848,
+      "distance_m": 92.638,
+      "wait_seconds": 0.383,
+      "replans": 9,
+      "collision_frames": 0,
+      "min_person_clearance_m": null,
+      "mode_counts": [
+        [
+          17,
+          219,
+          15,
+          0
+        ],
+        [
+          17,
+          219,
+          15,
+          0
+        ]
+      ]
+    }
+  ],
+  "initial_scene_generator": "collision-free-v2; invalid initial overlaps rejected"
+}

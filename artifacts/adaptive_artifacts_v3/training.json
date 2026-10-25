@@ -1,0 +1,602 @@
+[
+  {
+    "episode": 1,
+    "scenario": "corridor",
+    "seed": 1000,
+    "success": true,
+    "seconds": 43.567,
+    "reward": 321.45189854466656,
+    "epsilon": 0.45,
+    "transitions": 436
+  },
+  {
+    "episode": 2,
+    "scenario": "ring",
+    "seed": 1001,
+    "success": true,
+    "seconds": 36.917,
+    "reward": 273.4511805026923,
+    "epsilon": 0.44322033898305085,
+    "transitions": 806
+  },
+  {
+    "episode": 3,
+    "scenario": "corridor",
+    "seed": 1002,
+    "success": true,
+    "seconds": 43.683,
+    "reward": 302.8956583320107,
+    "epsilon": 0.4364406779661017,
+    "transitions": 1244
+  },
+  {
+    "episode": 4,
+    "scenario": "ring",
+    "seed": 1003,
+    "success": true,
+    "seconds": 24.017,
+    "reward": 201.599662693243,
+    "epsilon": 0.42966101694915254,
+    "transitions": 1486
+  },
+  {
+    "episode": 5,
+    "scenario": "corridor",
+    "seed": 1004,
+    "success": true,
+    "seconds": 38.9,
+    "reward": 295.4535400991664,
+    "epsilon": 0.4228813559322034,
+    "transitions": 1876
+  },
+  {
+    "episode": 6,
+    "scenario": "ring",
+    "seed": 1005,
+    "success": true,
+    "seconds": 23.233,
+    "reward": 199.72666666666655,
+    "epsilon": 0.4161016949152542,
+    "transitions": 2110
+  },
+  {
+    "episode": 7,
+    "scenario": "corridor",
+    "seed": 1006,
+    "success": true,
+    "seconds": 38.3,
+    "reward": 296.7865992425974,
+    "epsilon": 0.4093220338983051,
+    "transitions": 2494
+  },
+  {
+    "episode": 8,
+    "scenario": "ring",
+    "seed": 1007,
+    "success": true,
+    "seconds": 37.733,
+    "reward": 285.3821692282279,
+    "epsilon": 0.4025423728813559,
+    "transitions": 2872
+  },
+  {
+    "episode": 9,
+    "scenario": "corridor",
+    "seed": 1008,
+    "success": true,
+    "seconds": 40.1,
+    "reward": 273.00215301074326,
+    "epsilon": 0.3957627118644068,
+    "transitions": 3274
+  },
+  {
+    "episode": 10,
+    "scenario": "ring",
+    "seed": 1009,
+    "success": true,
+    "seconds": 53.65,
+    "reward": 392.56163369878954,
+    "epsilon": 0.3889830508474576,
+    "transitions": 3812
+  },
+  {
+    "episode": 11,
+    "scenario": "corridor",
+    "seed": 1010,
+    "success": true,
+    "seconds": 17.117,
+    "reward": 161.27477773910067,
+    "epsilon": 0.3822033898305085,
+    "transitions": 3984
+  },
+  {
+    "episode": 12,
+    "scenario": "ring",
+    "seed": 1011,
+    "success": true,
+    "seconds": 37.933,
+    "reward": 296.8596844111946,
+    "epsilon": 0.37542372881355934,
+    "transitions": 4364
+  },
+  {
+    "episode": 13,
+    "scenario": "corridor",
+    "seed": 1012,
+    "success": true,
+    "seconds": 18.0,
+    "reward": 165.909209381924,
+    "epsilon": 0.3686440677966102,
+    "transitions": 4544
+  },
+  {
+    "episode": 14,
+    "scenario": "ring",
+    "seed": 1013,
+    "success": true,
+    "seconds": 49.45,
+    "reward": 349.547424291392,
+    "epsilon": 0.36186440677966103,
+    "transitions": 5040
+  },
+  {
+    "episode": 15,
+    "scenario": "corridor",
+    "seed": 1014,
+    "success": true,
+    "seconds": 18.4,
+    "reward": 160.123948233724,
+    "epsilon": 0.3550847457627119,
+    "transitions": 5224
+  },
+  {
+    "episode": 16,
+    "scenario": "ring",
+    "seed": 1015,
+    "success": true,
+    "seconds": 24.017,
+    "reward": 206.8798187959183,
+    "epsilon": 0.3483050847457627,
+    "transitions": 5466
+  },
+  {
+    "episode": 17,
+    "scenario": "corridor",
+    "seed": 1016,
+    "success": true,
+    "seconds": 30.05,
+    "reward": 235.25777890752053,
+    "epsilon": 0.34152542372881356,
+    "transitions": 5768
+  },
+  {
+    "episode": 18,
+    "scenario": "ring",
+    "seed": 1017,
+    "success": true,
+    "seconds": 22.6,
+    "reward": 198.13483554795584,
+    "epsilon": 0.3347457627118644,
+    "transitions": 5994
+  },
+  {
+    "episode": 19,
+    "scenario": "corridor",
+    "seed": 1018,
+    "success": true,
+    "seconds": 90.1,
+    "reward": 455.115921375653,
+    "epsilon": 0.32796610169491525,
+    "transitions": 6896
+  },
+  {
+    "episode": 20,
+    "scenario": "ring",
+    "seed": 1019,
+    "success": true,
+    "seconds": 33.3,
+    "reward": 265.5445200986694,
+    "epsilon": 0.3211864406779661,
+    "transitions": 7230
+  },
+  {
+    "episode": 21,
+    "scenario": "corridor",
+    "seed": 1020,
+    "success": true,
+    "seconds": 78.5,
+    "reward": 406.46117323284784,
+    "epsilon": 0.31440677966101693,
+    "transitions": 8016
+  },
+  {
+    "episode": 22,
+    "scenario": "ring",
+    "seed": 1021,
+    "success": true,
+    "seconds": 22.017,
+    "reward": 199.42450525131795,
+    "epsilon": 0.30762711864406783,
+    "transitions": 8238
+  },
+  {
+    "episode": 23,
+    "scenario": "corridor",
+    "seed": 1022,
+    "success": true,
+    "seconds": 29.75,
+    "reward": 241.85437073583432,
+    "epsilon": 0.3008474576271186,
+    "transitions": 8536
+  },
+  {
+    "episode": 24,
+    "scenario": "ring",
+    "seed": 1023,
+    "success": true,
+    "seconds": 34.7,
+    "reward": 270.12657047687964,
+    "epsilon": 0.29406779661016946,
+    "transitions": 8884
+  },
+  {
+    "episode": 25,
+    "scenario": "corridor",
+    "seed": 1024,
+    "success": true,
+    "seconds": 44.767,
+    "reward": 321.8998882147777,
+    "epsilon": 0.28728813559322036,
+    "transitions": 9332
+  },
+  {
+    "episode": 26,
+    "scenario": "ring",
+    "seed": 1025,
+    "success": true,
+    "seconds": 36.867,
+    "reward": 292.7294424257065,
+    "epsilon": 0.2805084745762712,
+    "transitions": 9702
+  },
+  {
+    "episode": 27,
+    "scenario": "corridor",
+    "seed": 1026,
+    "success": true,
+    "seconds": 16.2,
+    "reward": 158.723948233724,
+    "epsilon": 0.27372881355932205,
+    "transitions": 9864
+  },
+  {
+    "episode": 28,
+    "scenario": "ring",
+    "seed": 1027,
+    "success": true,
+    "seconds": 52.033,
+    "reward": 386.0874357035222,
+    "epsilon": 0.2669491525423729,
+    "transitions": 10386
+  },
+  {
+    "episode": 29,
+    "scenario": "corridor",
+    "seed": 1028,
+    "success": true,
+    "seconds": 44.033,
+    "reward": 306.15719290420566,
+    "epsilon": 0.26016949152542374,
+    "transitions": 10828
+  },
+  {
+    "episode": 30,
+    "scenario": "ring",
+    "seed": 1029,
+    "success": true,
+    "seconds": 57.317,
+    "reward": 420.2739174110585,
+    "epsilon": 0.2533898305084746,
+    "transitions": 11402
+  },
+  {
+    "episode": 31,
+    "scenario": "corridor",
+    "seed": 1030,
+    "success": true,
+    "seconds": 17.6,
+    "reward": 165.59674553899515,
+    "epsilon": 0.24661016949152542,
+    "transitions": 11578
+  },
+  {
+    "episode": 32,
+    "scenario": "ring",
+    "seed": 1031,
+    "success": true,
+    "seconds": 23.55,
+    "reward": 201.25613010211708,
+    "epsilon": 0.23983050847457626,
+    "transitions": 11814
+  },
+  {
+    "episode": 33,
+    "scenario": "corridor",
+    "seed": 1032,
+    "success": true,
+    "seconds": 42.333,
+    "reward": 324.4109344851252,
+    "epsilon": 0.2330508474576271,
+    "transitions": 12238
+  },
+  {
+    "episode": 34,
+    "scenario": "ring",
+    "seed": 1033,
+    "success": true,
+    "seconds": 51.45,
+    "reward": 374.91910397498117,
+    "epsilon": 0.226271186440678,
+    "transitions": 12754
+  },
+  {
+    "episode": 35,
+    "scenario": "corridor",
+    "seed": 1034,
+    "success": true,
+    "seconds": 48.767,
+    "reward": 350.279585229812,
+    "epsilon": 0.2194915254237288,
+    "transitions": 13242
+  },
+  {
+    "episode": 36,
+    "scenario": "ring",
+    "seed": 1035,
+    "success": true,
+    "seconds": 51.233,
+    "reward": 396.5309257146211,
+    "epsilon": 0.2127118644067797,
+    "transitions": 13756
+  },
+  {
+    "episode": 37,
+    "scenario": "corridor",
+    "seed": 1036,
+    "success": true,
+    "seconds": 16.6,
+    "reward": 157.80394823372396,
+    "epsilon": 0.20593220338983048,
+    "transitions": 13922
+  },
+  {
+    "episode": 38,
+    "scenario": "ring",
+    "seed": 1037,
+    "success": true,
+    "seconds": 39.983,
+    "reward": 307.03569758687235,
+    "epsilon": 0.19915254237288138,
+    "transitions": 14322
+  },
+  {
+    "episode": 39,
+    "scenario": "corridor",
+    "seed": 1038,
+    "success": true,
+    "seconds": 16.0,
+    "reward": 160.323948233724,
+    "epsilon": 0.19237288135593222,
+    "transitions": 14482
+  },
+  {
+    "episode": 40,
+    "scenario": "ring",
+    "seed": 1039,
+    "success": true,
+    "seconds": 32.3,
+    "reward": 273.60315692174,
+    "epsilon": 0.18559322033898307,
+    "transitions": 14806
+  },
+  {
+    "episode": 41,
+    "scenario": "corridor",
+    "seed": 1040,
+    "success": true,
+    "seconds": 45.6,
+    "reward": 348.8818099252559,
+    "epsilon": 0.1788135593220339,
+    "transitions": 15262
+  },
+  {
+    "episode": 42,
+    "scenario": "ring",
+    "seed": 1041,
+    "success": true,
+    "seconds": 48.483,
+    "reward": 375.47390136564366,
+    "epsilon": 0.17203389830508475,
+    "transitions": 15748
+  },
+  {
+    "episode": 43,
+    "scenario": "corridor",
+    "seed": 1042,
+    "success": true,
+    "seconds": 40.6,
+    "reward": 321.8517215969584,
+    "epsilon": 0.1652542372881356,
+    "transitions": 16154
+  },
+  {
+    "episode": 44,
+    "scenario": "ring",
+    "seed": 1043,
+    "success": true,
+    "seconds": 50.083,
+    "reward": 379.8048534226691,
+    "epsilon": 0.15847457627118647,
+    "transitions": 16656
+  },
+  {
+    "episode": 45,
+    "scenario": "corridor",
+    "seed": 1044,
+    "success": true,
+    "seconds": 16.917,
+    "reward": 161.63094314745925,
+    "epsilon": 0.15169491525423728,
+    "transitions": 16826
+  },
+  {
+    "episode": 46,
+    "scenario": "ring",
+    "seed": 1045,
+    "success": true,
+    "seconds": 21.683,
+    "reward": 200.4388612493352,
+    "epsilon": 0.14491525423728815,
+    "transitions": 17044
+  },
+  {
+    "episode": 47,
+    "scenario": "corridor",
+    "seed": 1046,
+    "success": true,
+    "seconds": 16.833,
+    "reward": 163.02728156705706,
+    "epsilon": 0.13813559322033897,
+    "transitions": 17214
+  },
+  {
+    "episode": 48,
+    "scenario": "ring",
+    "seed": 1047,
+    "success": true,
+    "seconds": 51.067,
+    "reward": 399.1915575091139,
+    "epsilon": 0.13135593220338984,
+    "transitions": 17726
+  },
+  {
+    "episode": 49,
+    "scenario": "corridor",
+    "seed": 1048,
+    "success": true,
+    "seconds": 16.6,
+    "reward": 161.5610025164484,
+    "epsilon": 0.12457627118644066,
+    "transitions": 17892
+  },
+  {
+    "episode": 50,
+    "scenario": "ring",
+    "seed": 1049,
+    "success": true,
+    "seconds": 21.4,
+    "reward": 198.68999999999951,
+    "epsilon": 0.11779661016949153,
+    "transitions": 18106
+  },
+  {
+    "episode": 51,
+    "scenario": "corridor",
+    "seed": 1050,
+    "success": true,
+    "seconds": 16.4,
+    "reward": 158.64394823372407,
+    "epsilon": 0.1110169491525424,
+    "transitions": 18270
+  },
+  {
+    "episode": 52,
+    "scenario": "ring",
+    "seed": 1051,
+    "success": true,
+    "seconds": 22.733,
+    "reward": 199.97584843232275,
+    "epsilon": 0.10423728813559321,
+    "transitions": 18498
+  },
+  {
+    "episode": 53,
+    "scenario": "corridor",
+    "seed": 1052,
+    "success": true,
+    "seconds": 46.2,
+    "reward": 340.2907086901945,
+    "epsilon": 0.09745762711864409,
+    "transitions": 18960
+  },
+  {
+    "episode": 54,
+    "scenario": "ring",
+    "seed": 1053,
+    "success": true,
+    "seconds": 49.633,
+    "reward": 398.1468892597713,
+    "epsilon": 0.0906779661016949,
+    "transitions": 19458
+  },
+  {
+    "episode": 55,
+    "scenario": "corridor",
+    "seed": 1054,
+    "success": true,
+    "seconds": 15.2,
+    "reward": 158.3639482337241,
+    "epsilon": 0.08389830508474577,
+    "transitions": 19610
+  },
+  {
+    "episode": 56,
+    "scenario": "ring",
+    "seed": 1055,
+    "success": true,
+    "seconds": 61.85,
+    "reward": 430.12710261895563,
+    "epsilon": 0.07711864406779663,
+    "transitions": 20230
+  },
+  {
+    "episode": 57,
+    "scenario": "corridor",
+    "seed": 1056,
+    "success": true,
+    "seconds": 83.617,
+    "reward": 543.1572917295274,
+    "epsilon": 0.07033898305084746,
+    "transitions": 21068
+  },
+  {
+    "episode": 58,
+    "scenario": "ring",
+    "seed": 1057,
+    "success": true,
+    "seconds": 36.65,
+    "reward": 294.05006539017836,
+    "epsilon": 0.06355932203389832,
+    "transitions": 21436
+  },
+  {
+    "episode": 59,
+    "scenario": "corridor",
+    "seed": 1058,
+    "success": true,
+    "seconds": 26.033,
+    "reward": 232.41094593376783,
+    "epsilon": 0.05677966101694914,
+    "transitions": 21698
+  },
+  {
+    "episode": 60,
+    "scenario": "ring",
+    "seed": 1059,
+    "success": true,
+    "seconds": 48.1,
+    "reward": 389.8069237139236,
+    "epsilon": 0.05,
+    "transitions": 22180
+  }
+]

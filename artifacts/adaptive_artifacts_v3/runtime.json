@@ -1,0 +1,17 @@
+{
+  "python": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "packages": {
+    "numpy": "1.26.4",
+    "pybullet": "3.2.7",
+    "matplotlib": "3.10.9"
+  },
+  "source_sha256": {
+    "adaptive_patrol.py": "48b57f4da0785f2fcd10a4cdab8657b2e87bc359a8a42509fcee83bb0a8ae137",
+    "dynamic_route_planner.py": "f2bfcd0813d14a4d9bb8d7e4be8502538a2025f024081ead2ef6b4a1dccf8a7a",
+    "adaptive_patrol_demo.py": "26ca8c36a588a6d4309b70247cc87848a069def53e35df9b4d1d6e925e378d5f",
+    "patrol_scenarios.py": "46df5ace84282cc3f8ffb059cba5d7008236a43c34bc6b29dd26fd697ff8afa8",
+    "patrol_dispatch.py": "3b3b921bb510153880aa814cab8b1fd97c4b22ca3d25a0e51f4846e49ed61076",
+    "train_adaptive_patrol.py": "e94b159a2cff9551bce6f79c3d75828876669423ad213d860e361c0b9d077a7a",
+    "evaluate_adaptive_patrol.py": "04658fe5d0ac78e9af59c96ddc092f1056deda92a1a2f3c5a0a499d5e2a5ecca"
+  }
+}

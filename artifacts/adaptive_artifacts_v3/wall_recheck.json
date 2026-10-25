@@ -1,0 +1,11 @@
+{
+  "controller": "balanced_short",
+  "seed": 8019,
+  "simulated_seconds": 15.367,
+  "wall_seconds": 0.9177525999839418,
+  "completed": true,
+  "static_collision_frames": 0,
+  "person_collision_frames": 0,
+  "robot_overlap_frames": 0,
+  "original_wall_seconds": 11632.717140100023
+}

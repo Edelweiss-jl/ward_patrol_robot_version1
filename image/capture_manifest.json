@@ -1,0 +1,90 @@
+[
+  {
+    "file": "20261025_adaptive_corridor_01_initial.jpg",
+    "captured_at": "2026-10-25T06:24:04.213Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "corridor",
+    "sim_time": 0,
+    "stage": "01_initial",
+    "sha256": "25a2ea96df2e64dae399ec92a2dc9f809c5566e444416cfa132018099f24d1f8",
+    "title": "走廊病区：初始布局与就近任务分配"
+  },
+  {
+    "file": "20261025_adaptive_corridor_02_patrolling.jpg",
+    "captured_at": "2026-10-25T06:24:25.173Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "corridor",
+    "sim_time": 4.016666666666658,
+    "stage": "02_patrolling",
+    "sha256": "85e3b268f5dd9f5d5c3ea63535569560cc189991cf68321c6b23fba81f3e6ef5",
+    "title": "走廊病区：两台机器人同时穿门巡查"
+  },
+  {
+    "file": "20261025_adaptive_corridor_03_first_completed.jpg",
+    "captured_at": "2026-10-25T06:24:43.295Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "corridor",
+    "sim_time": 5.799999999999985,
+    "stage": "03_first_completed",
+    "sha256": "65fce9ced637e678257517baa7b6a1b12fe39ae244969eb1202b116aef9b6acd",
+    "title": "走廊病区：首批两项任务完成"
+  },
+  {
+    "file": "20261025_adaptive_corridor_04_complete.jpg",
+    "captured_at": "2026-10-25T06:25:08.028Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "corridor",
+    "sim_time": 15.200000000000335,
+    "stage": "04_complete",
+    "sha256": "600a7e0cfe3e972fac9d8f6351fa7472985a02abaaa4b1da0dfad5cbd6b18261",
+    "title": "走廊病区：四项任务全部完成"
+  },
+  {
+    "file": "20261025_adaptive_ring_01_initial.jpg",
+    "captured_at": "2026-10-25T06:25:44.914Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "ring",
+    "sim_time": 0,
+    "stage": "01_initial",
+    "sha256": "d083458b1ad75799b7958c11202ece28484691e4bf2a7c44c79633f6e9452450",
+    "title": "环形病区：不同地图上的初始任务分配"
+  },
+  {
+    "file": "20261025_adaptive_ring_02_patrolling.jpg",
+    "captured_at": "2026-10-25T06:26:03.277Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "ring",
+    "sim_time": 4.016666666666658,
+    "stage": "02_patrolling",
+    "sha256": "5c89a2075f89e32faf9502b14d70d6365404868ed311e296d621c41cac005839",
+    "title": "环形病区：绕中央区域行进与规划模式选择"
+  },
+  {
+    "file": "20261025_adaptive_ring_03_first_completed.jpg",
+    "captured_at": "2026-10-25T06:26:27.592Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "ring",
+    "sim_time": 7.233333333333313,
+    "stage": "03_first_completed",
+    "sha256": "132cb97afd29c71662409e6850b31dc8ebd032d4eca07d8c45a6647cf29a0650",
+    "title": "环形病区：任务完成与床旁停留的区别"
+  },
+  {
+    "file": "20261025_adaptive_ring_04_complete.jpg",
+    "captured_at": "2026-10-25T06:27:08.211Z",
+    "width": 1538,
+    "height": 1200,
+    "scenario": "ring",
+    "sim_time": 20.95000000000009,
+    "stage": "04_complete",
+    "sha256": "400f15f8c5e2f34c4a281a4e65e952f6a27d20305f1fca50d7c196069161c638",
+    "title": "环形病区：完整巡查结束"
+  }
+]

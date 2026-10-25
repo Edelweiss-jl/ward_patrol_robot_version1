@@ -1,0 +1,4 @@
+# 仅运行、训练和评估自适应规划所需；无需安装PyTorch/SB3。
+numpy==1.26.4
+pybullet==3.2.7
+# 汇报图另需matplotlib；项目已有PPO环境已包含。
