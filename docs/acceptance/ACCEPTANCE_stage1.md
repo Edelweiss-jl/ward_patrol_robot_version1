@@ -19,11 +19,11 @@
 .\venv\Scripts\python.exe -m ward_patrol_web.server
 ```
 
-打开 http://127.0.0.1:8000 。可给 Web 命令加 `--gui` 打开同一世界的 PyBullet 窗口，空格暂停/继续会提交核心命令。终端 Ctrl+C 停止对应服务。broker 只监听 127.0.0.1:1883。
+打开 [简易监控](http://127.0.0.1:8000/monitor)。可给 Web 命令加 `--gui` 打开同一世界的 PyBullet 窗口，空格暂停/继续会提交核心命令。终端 Ctrl+C 停止对应服务。broker 只监听 127.0.0.1:1883。
 
 ## 顺序验收
 
-1. 选 N1-1，填写床位资料并保存。创建巡查任务。再选 S3-2 创建任务。两台车从各自停车点出发，任务表显示派车结果。
+1. 分别选择 N1-1 和 S3-2，将床位状态设为「已有入住」，填写年龄和诊断并保存。为两个床位创建巡查任务。两台车从各自停车点出发，任务表显示派车结果。
 2. 观察时间线依次出现 task_arrived、service_started、vitals_received、task_completed。体征事件显示模拟数值。车辆收到匹配回执后释放任务。
 3. 点击暂停，仿真秒数和步号冻结。此时 MQTT 回执可以进入队列，继续后在步边界应用。
 4. 选择 2 倍或 4 倍，观察相同墙钟时间内推进步数增多，步长仍为 1/60 秒。
@@ -42,7 +42,7 @@
 
 实际 MQTT 测试覆盖暂停积压回执、重复请求、重复回执、一次完成、HTTP/SSE、Web 发任务、命令行双床任务和 1 倍/2 倍步数测量。额外核心测试覆盖旧尝试迟到回执、重复取消和手动采样。
 
-只运行命令行时，先启动 broker 和体征服务。
+只运行命令行时，先启动 broker 和体征服务。命令行默认从 `outputs/runs/beds.json` 读取床位资料，也可用 `--output` 指定资料和运行记录目录。
 
 ```powershell
 .\venv\Scripts\python.exe -m ward_patrol.runtime.cli --beds N1-1 S3-2
@@ -68,6 +68,6 @@
 
 AMQTT 0.12.2 是实际运行的本地 MQTT broker。Paho 为 2.2.0。无需另装 Mosquitto。本阶段 GUI 键盘和浏览器视觉效果仍需人工验收，自动测试已验证 HTTP/SSE 与真实消息链路。资源预约和跨层执行按后续阶段实施。
 
-重复 sample_id 返回持久化结果。相同 command_id 重投会记录 command_duplicate。cancel_task 和 retry_task 接受 task_id，重试增加 attempt_id，旧尝试回执记录 receipt_late。核心完成记录只接受匹配 run_id、task_id、attempt_id、bed_id、robot_id、source、sample_id 的非空体征回执。断链时请求保留，并周期重发等待回执的请求。
+重复 sample_id 返回持久化结果。相同 command_id 重投会记录 command_duplicate。cancel_task 和 retry_task 接受 task_id，重试增加 attempt_id，旧尝试回执记录 receipt_late。已入住床位凭匹配任务和执行尝试的有效体征回执完成巡查。空床和入住未登记的床位到站后记录 bed_checked 并完成巡查。断链时请求保留，并周期重发等待回执的请求。
 
 验收通过后回复“阶段 1 验收通过，开始阶段 2”。

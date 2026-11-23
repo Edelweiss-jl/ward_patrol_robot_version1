@@ -37,8 +37,7 @@ class FleetPlanning:
         # Cancellation, retries, new work and changed navigation rules do.
         tasks = tuple((t.task_id,t.status=='cancelled',self.attempts.get(t.task_id,1),
                        self.task_specs[t.task_id]['release']<=self.elapsed) for t in self.tasks)
-        escaping = tuple(r.robot_id for r in self.robots if r.task_id is None and
-                         (r.robot_id in self.elevator_requests or r.robot_id in self.passage_escapes))
+        escaping = tuple(r.robot_id for r in self.robots if r.task_id is None and self.parking_preemption_blocked(r))
         period = int(self.elapsed/self.dispatch_policy.replan_interval_seconds) if any(t.status=='pending' for t in self.tasks) else 0
         return (tasks,self.planning_environment(),escaping,self.coverage_revision,self.policy_revision,
                 self.elevator_risk_revision,period,int(self.elapsed//3600)%24)
@@ -67,9 +66,10 @@ class FleetPlanning:
         self.planning_metrics['computation_ms'] = round(self.planning_metrics['computation_ms']+duration,3)
         self.planning_metrics['planned'] = len(self.dispatch_plan)
 
-    def _remaining_work(self, robot):
+    def _remaining_work(self, robot, *, include_parking=False):
         task = self.task_for(robot)
-        if task is None:
+        if task is None or (not include_parking and robot.robot_id in self.parking_moves
+                            and not self.parking_preemption_blocked(robot)):
             return self.robot_floors[robot.robot_id],robot.xy,0.,0.
         model = self.models[self.robot_instances[robot.robot_id]['model_id']]
         distance = path_length([robot.xy,*robot.path])
@@ -163,14 +163,14 @@ class FleetPlanning:
         states,bed_ready = {},{}
         projected = self.projected_robot_floors()
         for robot in self.robots:
-            if robot.task_id is None and (robot.robot_id in self.elevator_requests or robot.robot_id in self.passage_escapes):
+            if robot.task_id is None and self.parking_preemption_blocked(robot):
                 continue
             floor,position,distance,seconds = self._remaining_work(robot)
             charge,reserve = self.available_battery(robot)
             states[robot.robot_id] = dict(floor=floor,position=position,available=self.elapsed+seconds,
                 charge=charge-distance*self.battery_use_per_meter,reserve=reserve,sequence=0)
             task = self.task_for(robot)
-            if task:
+            if task and robot.robot_id not in self.parking_moves:
                 bed_ready[task.bed_id] = self.elapsed+seconds
 
         pending = sorted((t for t in self.tasks if t.status=='pending'),key=self.task_order_key)
@@ -216,7 +216,9 @@ class FleetPlanning:
                 route,_ = self.find_robot_route(virtual,model,destination,task.goal,origin=state['floor'])
                 if route:
                     seconds,distance,actions = route
-                    if state['charge']-distance*self.battery_use_per_meter>=state['reserve']-1e-9:
+                    required = self.parking_requirement(self.by_robot[identity],model,destination,task.goal,
+                                                        distance,state['charge'],state['reserve'])
+                    if required<=state['charge']+1e-9:
                         start = max(self.elapsed,state['available'],spec['release'],bed_ready.get(task.bed_id,0.))
                         finish = start+seconds+service
                         rank = self.assignment_rank(projected,identity,destination,self.elevator_rides(actions),
@@ -317,7 +319,7 @@ class FleetPlanning:
             states[robot.robot_id] = dict(floor=floor,position=position,available=self.elapsed+seconds,
                 charge=charge-distance*self.battery_use_per_meter,reserve=reserve)
             active = self.task_for(robot)
-            if active:
+            if active and robot.robot_id not in self.parking_moves:
                 bed_ready[active.bed_id] = self.elapsed+seconds
         indices = {key:0 for key in queues}
         while any(indices[key]<len(queue) for key,queue in queues.items()):
@@ -339,11 +341,14 @@ class FleetPlanning:
                 return None
             route,_ = self.find_robot_route(SimpleNamespace(robot_id=identity,xy=state['position']),model,
                                            floor,task.goal,origin=state['floor'])
-            budget['used_ms'] += (time.perf_counter()-started)*1000
             if route is None:
+                budget['used_ms'] += (time.perf_counter()-started)*1000
                 return None
             seconds,distance,actions = route
-            if state['charge']-distance*self.battery_use_per_meter<state['reserve']-1e-9:
+            required = self.parking_requirement(self.by_robot[identity],model,floor,task.goal,
+                                                distance,state['charge'],state['reserve'])
+            budget['used_ms'] += (time.perf_counter()-started)*1000
+            if required>state['charge']+1e-9:
                 return None
             start = max(self.elapsed,state['available'],spec['release'],bed_ready.get(task.bed_id,0.))
             finish = start+seconds+self.service_estimate(spec)

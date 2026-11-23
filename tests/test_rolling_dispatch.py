@@ -8,7 +8,7 @@ from ward_patrol.maps.geometry import DEFAULT_MODELS, blank_map
 from ward_patrol.runtime.dispatch_policy import DispatchPolicy
 from ward_patrol.runtime.editable import EditableRuntime
 from tests.test_fast_dispatch import plan_until_ready
-from tests.test_floor_coverage import same_floor_fleet
+from tests.test_floor_coverage import local_parking_before_restocking, same_floor_fleet
 from tests.test_stage4 import setup, advance_until
 
 
@@ -145,7 +145,7 @@ class RollingCoverageTests(unittest.TestCase):
 
     def test_ordinary_arrival_keeps_useful_onboard_relocation(self):
         with TemporaryDirectory() as root:
-            core = EditableRuntime(*setup(),output=root)
+            core = EditableRuntime(*local_parking_before_restocking(),output=root)
             try:
                 core.add_task('F2-bed-service',robot_id='R1',service='dwell',duration=0)
                 lift = core.elevators['E1']

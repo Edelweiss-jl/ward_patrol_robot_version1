@@ -7,6 +7,7 @@ from pathlib import Path
 from queue import Queue, Empty
 import uuid
 
+from ward_patrol.runtime.vitals import bed_check_without_vitals
 from ward_patrol.simulation.dual_robot_demo import DualRobotSimulation, DT
 
 
@@ -69,6 +70,9 @@ class Runtime(DualRobotSimulation):
             return False
         return super().advance_robot(robot)
 
+    def sample_bed_info(self, bed):
+        return self.bed_info.get(bed, {})
+
     def request_sample(self, bed, source, task=None, robot=None, *, observe_only=False):
         sample_id = self.run_id + '-S' + str(len(self.samples)+1)
         request = dict(sample_id=sample_id, run_id=self.run_id, bed_id=bed,
@@ -76,8 +80,22 @@ class Runtime(DualRobotSimulation):
                        attempt_id=task.task_id+'-A'+str(self.attempts.get(task.task_id,1)) if task else None,
                        robot_id=robot.robot_id if robot else None, source=source,
                        seq=len(self.samples)+1, sim_time=self.elapsed)
+        info = self.sample_bed_info(bed)
+        if info is not None:
+            status = info.get('bed_status')
+            request['bed_status'] = status if status in ('vacant', 'occupied') else 'unrecorded'
+            patient = info.get('patient')
+            if status == 'occupied' and isinstance(patient, dict):
+                request['profile'] = {key: patient.get(key) for key in ('age', 'diagnosis')}
         self.samples[sample_id] = dict(request=request, accepted=False)
-        self.emit('sample_requested', sample_id=sample_id, source=source)
+        self.emit('sample_requested', robot, task, sample_id=sample_id, source=source)
+        result = bed_check_without_vitals(request)
+        if result is not None:
+            if observe_only:
+                self.record_sample(self.samples[sample_id], result, task)
+            else:
+                self.receipt(result)
+            return
         if not (self.local_sampling or observe_only):
             self.outbox.append(request)
             return
@@ -95,7 +113,8 @@ class Runtime(DualRobotSimulation):
     def record_sample(self, sample, message, task):
         sample['accepted'] = True
         sample['result'] = deepcopy(message)
-        self.emit('vitals_received', task=task, sample_id=message['sample_id'],
+        event = 'vitals_received' if message.get('vitals') else 'bed_checked'
+        self.emit(event, task=task, sample_id=message['sample_id'],
                   source=sample['request']['source'], payload=message)
 
     def receipt(self, message):
@@ -111,23 +130,29 @@ class Runtime(DualRobotSimulation):
         if sample['accepted']:
             self.emit('receipt_duplicate', sample_id=message['sample_id'])
             return
-        request = sample['request']
-        task = next((t for t in self.tasks if t.task_id == request['task_id']), None)
         if task and task.status != 'assigned':
             self.emit('receipt_late', payload=message)
             return
-        if not isinstance(message.get('vitals'), dict) or not message['vitals']:
+        status = request.get('bed_status')
+        vitals = message.get('vitals')
+        verdict = message.get('verdict')
+        if status in ('vacant', 'unrecorded'):
+            valid = isinstance(verdict, dict) and verdict.get('status') == status and vitals is None
+        else:
+            valid = isinstance(vitals, dict) and bool(vitals)
+        if not valid:
             self.emit('receipt_invalid', payload=message)
             return
         self.record_sample(sample, message, task)
         if task:
             robot = next(r for r in self.robots if r.robot_id == task.robot_id)
-            task.status, task.completed_at = 'completed', self.elapsed
-            self.emit('task_completed', robot, task, sample_id=message['sample_id'])
-            robot.task_id = None
-            robot.status = 'idle'
-            robot.path = []
-            robot.completed_tasks += 1
+            self.finish(task,robot,sample_id=message['sample_id'])
+
+    def finish(self, task, robot, **fields):
+        task.status, task.completed_at = 'completed', self.elapsed
+        self.emit('task_completed',robot,task,**fields)
+        robot.task_id,robot.path,robot.status = None,[],'idle'
+        robot.completed_tasks += 1
 
     def advance(self):
         # Control commands are applied at the frozen boundary while paused.

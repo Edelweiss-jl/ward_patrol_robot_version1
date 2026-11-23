@@ -87,7 +87,7 @@ class FastDispatchTests(unittest.TestCase):
         floor['objects'] = [dict(id=key,kind=kind,x=x,y=0,width=.2,height=.2)
                             for key,kind,x in [('P','parking',-4),('A','service',0),('B','service',4)]]
         fleet = [dict(id='R1',model_id='small',floor_id='F1',pose=[-4,0,0],parking_id='P',
-                      battery_percent=20.6,safety_battery_percent=20)]
+                      battery_percent=21.,safety_battery_percent=20)]
         with TemporaryDirectory() as root:
             core = EditableRuntime(document,DEFAULT_MODELS,fleet,output=root)
             try:

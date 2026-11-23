@@ -33,11 +33,12 @@ class PassageExecution:
         result = []
         reservations = {(item['floor_id'],item['parking_id']):identity
                         for identity,item in self.robot_instances.items()}
+        returns = {move['spot']:identity for identity,move in self.parking_moves.items()}
         for (floor_id,identity), point in self.parking_resources.items():
             occupants = [robot.robot_id for robot in self.robots if self.robot_floors[robot.robot_id]==floor_id
                          and self.planners[robot.robot_id].inside(robot.xy,point)]
             result.append(dict(id=identity,floor_id=floor_id,reserved_robot_id=reservations.get((floor_id,identity)),
-                               occupant_robot_ids=occupants))
+                               returning_robot_id=returns.get((floor_id,identity)),occupant_robot_ids=occupants))
         return result
 
     def passage_command(self, command):

@@ -8,6 +8,7 @@ class RuntimeTests(unittest.TestCase):
     def setUp(self):
         self.directory=tempfile.TemporaryDirectory()
         self.core=Runtime(output=self.directory.name)
+        self.core.bed_info['N1-1'] = dict(bed_status='occupied', patient=dict(age=70, diagnosis='高血压'))
 
     def tearDown(self):
         self.core.close()
@@ -47,6 +48,22 @@ class RuntimeTests(unittest.TestCase):
         self.core.advance()
         self.assertEqual(sum(e['event']=='vitals_received' for e in self.core.events),1)
         self.assertEqual(sum(e['event']=='task_completed' for e in self.core.events),0)
+
+    def test_vacant_arrival_finishes_without_vitals_or_mqtt(self):
+        self.core.bed_info['N1-1'] = dict(bed_status='vacant')
+        self.core.submit(dict(action='create_task',bed='N1-1'))
+        for _ in range(3000):
+            self.core.advance()
+            if self.core.tasks[0].status == 'completed':
+                break
+        self.assertEqual(self.core.tasks[0].status, 'completed')
+        sample, = self.core.snapshot()['samples'].values()
+        self.assertTrue(sample['accepted'])
+        self.assertEqual(sample['result']['verdict']['status'], 'vacant')
+        self.assertNotIn('vitals', sample['result'])
+        self.assertFalse(self.core.outbox)
+        self.assertIsNone(self.core.vitals_sampler)
+        self.assertIn('bed_checked', [event['event'] for event in self.core.events])
 
     def test_ending_paused_run_saves_a_frame_and_cannot_resume(self):
         self.core.advance()

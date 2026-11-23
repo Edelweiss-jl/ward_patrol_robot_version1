@@ -19,6 +19,7 @@
 
 .model-tooltip{position:fixed;z-index:10000;pointer-events:none;max-width:min(290px,calc(100vw - 16px));padding:10px 12px;background:#173542;color:#fff;border-radius:8px;box-shadow:0 4px 16px #14313c40;line-height:1.5}
 .model-tooltip strong,.model-tooltip span{display:block}
+.model-tooltip span:empty{display:none}
 .model-tooltip .model-size{color:#c3e0e2;font-size:12px;margin-bottom:4px}
 .model-tooltip .model-controls{font-size:12px;color:#d3e7e8;margin-top:5px}
 
@@ -335,7 +336,7 @@
   <h2 id="archivedTasksTitle">已归档巡查任务</h2>
   <label>搜索 <input id="archivedTaskSearch" type="search" placeholder="任务编号、地图编号或床位"></label>
   <div class="archive-list">
-    <table><thead><tr><th scope="col">任务编号</th><th scope="col">床位</th><th scope="col">归档时间</th><th scope="col">运行记录</th></tr></thead><tbody id="archivedTaskRows"></tbody></table>
+    <table><thead><tr><th scope="col">任务编号</th><th scope="col">床位</th><th scope="col">归档时间</th><th scope="col">运行记录</th><th scope="col">操作</th></tr></thead><tbody id="archivedTaskRows"></tbody></table>
   </div>
   <p id="archivedTaskStatus" class="muted" role="status"></p>
 </section>

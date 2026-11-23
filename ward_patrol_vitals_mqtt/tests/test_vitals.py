@@ -64,6 +64,25 @@ class GeneratorTest(unittest.TestCase):
                        for i in range(40))
         self.assertEqual(abnormal, 0)
 
+    def test_age_changes_baseline_and_diagnosis_weights_matching_scenario(self):
+        gen = VitalsGenerator(CFG)
+
+        def samples(profile, abnormal):
+            return [gen.generate("B1", seq, abnormal=abnormal, profile=profile) for seq in range(200)]
+
+        young = samples({"age": 8}, False)
+        older = samples({"age": 75}, False)
+        self.assertGreater(sum(row["vitals"]["heart_rate"] for row in young),
+                           sum(row["vitals"]["heart_rate"] for row in older))
+        self.assertGreater(sum(row["vitals"]["systolic_bp"] for row in older),
+                           sum(row["vitals"]["systolic_bp"] for row in young))
+        diagnosed = samples({"diagnosis": "高血压"}, True)
+        baseline = samples({"diagnosis": "否认高血压"}, True)
+        self.assertGreater(sum(row["scenario"] == "hypertension" for row in diagnosed),
+                           sum(row["scenario"] == "hypertension" for row in baseline))
+        repeated = samples({"diagnosis": "高血压"}, True)
+        self.assertEqual([row["vitals"] for row in diagnosed], [row["vitals"] for row in repeated])
+
 
 class AnalyzerTest(unittest.TestCase):
     def setUp(self):

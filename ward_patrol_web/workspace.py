@@ -12,6 +12,7 @@ from ward_patrol.maps.templates import hospital_templates
 from ward_patrol.maps.elevators import elevator_action
 from ward_patrol.runtime.editable import normalize_patrol_fields, validate_models, validate_parking_assignments, validate_setup
 from ward_patrol.runtime.elevator import Ride, build_elevators, cross_floor_route
+from ward_patrol_web.run_visibility import visible_run_data
 
 
 TASK_NUMBER_TIMEZONE = timezone(timedelta(hours=8))
@@ -335,6 +336,7 @@ class Workspace:
             if self._assign_legacy_task_numbers(records):
                 self._write_json(self.task_queue_path, records)
             tasks = [dict(id=task['id'], number=task.get('display_number') or task['id'], map_id=task['map_id'],
+                          request_id=task.get('request_id'),
                           beds=task.get('bed_labels', task.get('beds', [])),
                           created_at=task.get('created_at'), archived_at=task.get('archived_at'),
                           run_id=task.get('run_id')) for task in archived]
@@ -352,6 +354,8 @@ class Workspace:
             if task['map_id'] != data['map_id'] or task.get('request_id') != data.get('request_id'):
                 raise ValueError('任务记录已变化，请刷新队列后重试')
             if task.get('archived'):
+                if permanent:
+                    return self._delete_published_task(records, task)
                 return {'deleted': False, 'archived': True}
             if task['status'] == 'published':
                 _, _, visit_states, _ = self._task_bed_occupancy(task['map_id'], records, state)
@@ -359,19 +363,34 @@ class Workspace:
                 if (statuses and len(statuses) == len(task['beds']) * task['count']
                         and all(status in TERMINAL_VISIT_STATES for status in statuses)):
                     if permanent:
-                        # Reserve the published ID because the runtime groups older visits by that ID.
-                        records[task_id] = dict(id=task_id, map_id=task['map_id'], status='deleted')
-                        self._write_json(self.task_queue_path, records)
-                        return {'deleted': True}
+                        return self._delete_published_task(records, task)
                     task['archived'] = True
                     task['archived_at'] = datetime.now(timezone.utc).isoformat()
                     self._write_json(self.task_queue_path, records)
                     return {'deleted': True, 'archived': True}
             if task['status'] not in ('saved', 'queued'):
                 raise ValueError('任务尚未结束，无法删除')
+            if task.get('resumed_from'):
+                return self._delete_published_task(records, task)
             del records[task_id]
             self._write_json(self.task_queue_path, records)
             return {'deleted': True}
+
+    def _delete_published_task(self, records, task):
+        # The stable ID keeps task data filtered across all runs, including interrupted runs.
+        records[task['id']] = dict(id=task['id'], map_id=task['map_id'], status='deleted')
+        self._write_json(self.task_queue_path, records)
+        return {'deleted': True}
+
+    def _deleted_patrol_ids(self, map_id):
+        with self.lock:
+            return {task['id'] for task in self._task_records().values()
+                    if task['map_id'] == map_id and task['status'] == 'deleted'}
+
+    def visible_snapshot(self, snapshot):
+        frames, _ = visible_run_data([snapshot], snapshot.get('events', []),
+                                     self._deleted_patrol_ids(snapshot.get('map_id')))
+        return frames[0]
 
     @staticmethod
     def _assign_legacy_task_numbers(records):
@@ -491,8 +510,11 @@ class Workspace:
         if not re.fullmatch('[a-f0-9]{32}',identity):
             raise ValueError('运行 ID 无效')
         folder=self.root/'runs'/identity
-        return dict(map=json.loads((folder/'map.json').read_text(encoding='utf-8')),
-                    snapshots=self._read_json_lines(folder/'snapshots.jsonl'),events=self._read_json_lines(folder/'events.jsonl'),
+        document = json.loads((folder/'map.json').read_text(encoding='utf-8'))
+        snapshots, events = visible_run_data(self._read_json_lines(folder/'snapshots.jsonl'),
+                                             self._read_json_lines(folder/'events.jsonl'),
+                                             self._deleted_patrol_ids(document.get('id') or document.get('map_id')))
+        return dict(map=document, snapshots=snapshots, events=events,
                     input=json.loads((folder/'input.json').read_text(encoding='utf-8')))
 
     def get(self, path):

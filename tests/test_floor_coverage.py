@@ -21,6 +21,15 @@ def same_floor_fleet():
     return document,models,fleet
 
 
+def local_parking_before_restocking():
+    document,models,fleet = setup()
+    # F2 can park both vehicles. Restocking F1 then exercises the coverage
+    # policy independently of a cross-floor parking return.
+    document['floors'][1]['objects'].append(dict(id='F2-extra-parking',kind='parking',
+                                                x=-4,y=1,width=.3,height=.3))
+    return document,models,fleet
+
+
 class FloorCoverageTests(unittest.TestCase):
     def test_resident_is_selected_even_when_remote_estimate_is_faster(self):
         with TemporaryDirectory() as root:
@@ -29,8 +38,8 @@ class FloorCoverageTests(unittest.TestCase):
                 task = core.add_task('F2-bed-service',service='dwell')
                 original = core.find_robot_route
 
-                def estimates(robot,model,destination,goal,origin=None):
-                    route,reason = original(robot,model,destination,goal,origin=origin)
+                def estimates(robot,model,destination,goal,origin=None,**options):
+                    route,reason = original(robot,model,destination,goal,origin=origin,**options)
                     if route:
                         _,distance,actions = route
                         route = (1. if robot.robot_id=='R1' else 40.,distance,actions)
@@ -95,7 +104,7 @@ class FloorCoverageTests(unittest.TestCase):
 
     def test_explicit_assignment_is_honored_then_missing_floor_is_restocked(self):
         with TemporaryDirectory() as root:
-            core = EditableRuntime(*setup(),output=root)
+            core = EditableRuntime(*local_parking_before_restocking(),output=root)
             try:
                 task = core.add_task('F2-bed-service',robot_id='R1',service='dwell',duration=0)
                 advance_until(core,lambda: bool(core.coverage_moves),limit=10000)
@@ -114,7 +123,7 @@ class FloorCoverageTests(unittest.TestCase):
 
     def test_new_patrol_interrupts_restocking_onboard_without_releasing_lift_early(self):
         with TemporaryDirectory() as root:
-            core = EditableRuntime(*setup(),output=root)
+            core = EditableRuntime(*local_parking_before_restocking(),output=root)
             try:
                 core.add_task('F2-bed-service',robot_id='R1',service='dwell',duration=0)
                 lift = core.elevators['E1']
@@ -135,7 +144,7 @@ class FloorCoverageTests(unittest.TestCase):
 
     def test_elevator_shutdown_cancels_standby_reservation_and_retries_on_restore(self):
         with TemporaryDirectory() as root:
-            core = EditableRuntime(*setup(),output=root)
+            core = EditableRuntime(*local_parking_before_restocking(),output=root)
             try:
                 core.add_task('F2-bed-service',robot_id='R1',service='dwell',duration=0)
                 lift = core.elevators['E1']
@@ -227,6 +236,11 @@ class ElevatorRidePreferenceTests(unittest.TestCase):
         rides = [action for action in route[2] if isinstance(action,Ride)]
         self.assertEqual([ride.elevator_id for ride in rides],['direct'])
         self.assertGreater(route[0],90.)
+        fastest = cross_floor_route(lifts,{'F1':0,'F2':1,'F3':2},
+                                    {floor:planner for floor in ('F1','F2','F3')},model,
+                                    'F1',(0,0),'F3',(0,0),fastest=True)
+        self.assertLess(fastest[0],route[0])
+        self.assertEqual([ride.elevator_id for ride in fastest[2] if isinstance(ride,Ride)],['lower','upper'])
 
 
 if __name__=='__main__':

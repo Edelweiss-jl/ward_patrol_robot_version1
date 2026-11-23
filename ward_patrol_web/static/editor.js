@@ -123,10 +123,10 @@ function draw() {
       }
       continue;
     }
-    if (o.kind==='elevator' && o.wall_id) continue;
-    const color={door:'#20a088',parking:'#677cc1',service:'#187d62',forbidden:'#e37e7e',one_way:'#d9b751',single_lane:'#9aa9d888',elevator:elevatorAccent,waiting:'#d4a640',exit:'#69a6b5'}[o.kind];
+    if (o.kind==='elevator') continue;
+    const color={door:'#20a088',parking:'#677cc1',service:'#187d62',forbidden:'#e37e7e',one_way:'#d9b751',single_lane:'#9aa9d888',waiting:'#d4a640',exit:'#69a6b5'}[o.kind];
     rectangle(o,color,o.kind==='door');
-    if (o.kind==='parking' || o.kind==='elevator') {
+    if (o.kind==='parking') {
       if(o.id===selected) rectangle(o,'#e34d43',true);
       continue;
     }
@@ -134,6 +134,7 @@ function draw() {
     if(o.kind==='one_way'){ctx.save();ctx.translate(x,y);ctx.rotate(-(o.rotation||0)*Math.PI/180);ctx.fillText('→',0,4);ctx.restore();}
     if(o.id===selected)rectangle(o,'#e34d43',true);
   }
+  drawElevatorEntrances(f,false);
   for(const route of preview.filter(r=>r.floor_id===f.id&&r.path.length)){ctx.beginPath();ctx.strokeStyle='#187d62';ctx.lineWidth=2;route.path.forEach((p,i)=>i?ctx.lineTo(...point(...p)):ctx.moveTo(...point(...p)));ctx.stroke();}
   drawFleet(f);
 }
@@ -1717,8 +1718,9 @@ $('saveTask').onclick=()=>handleTaskAction(saveEditorTask);
 $('publishSelectedTasks').onclick=()=>handleTaskAction(()=>publishEditorTasks([...selectedSavedTasks],documentMap.id));
 
 async function deleteSavedTask(record, permanent=false) {
-  const number=record.display_number||record.id;
-  const question=permanent?'删除任务 '+number+'？删除后无法恢复。':
+  const number=record.display_number||record.number||record.id;
+  const question=permanent || record.resumed_from ?
+    '删除任务 '+number+'？该任务的巡检结果和地图标记会一并移除，删除后无法恢复。':
     record.status==='published'?'归档任务 '+number+'？归档后可在「归档管理」中查询。':
       '删除任务 '+number+' 并释放编号？';
   if (!confirm(question)) return;
@@ -1729,15 +1731,17 @@ async function deleteSavedTask(record, permanent=false) {
     }
     throw error;
   });
-  if (documentMap.id!==record.map_id || replay) return;
+  if (documentMap.id!==record.map_id || replay) return result;
   ++taskQueueRequest;
   selectedSavedTasks.delete(record.id);
   taskRecords=taskRecords.filter(task=>task.id!==record.id || task.request_id!==record.request_id);
   if (result.archived) taskRecords.push({...record,archived:true});
+  else hideModelTooltip();
   renderTaskQueues(viewingCurrentRun());
   taskFeedback(result.archived?'任务 '+number+' 已归档。':
     result.deleted?(permanent?'已删除任务 '+number+'。':'已删除任务 '+number+'，编号已释放。'):
       '任务 '+number+' 已不在队列中。');
+  return result;
 }
 
 const taskQueueStatus={pending:'待分配',assigned:'执行中',completed:'已完成',cancelled:'已取消',expired:'已超时'};

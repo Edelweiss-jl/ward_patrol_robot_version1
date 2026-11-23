@@ -120,7 +120,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type',content_type)
         self.send_header('Content-Length',str(len(body)))
-        if self.path.partition('?')[0] in ('/api/editor/tasks', '/api/maps', '/api/maps/manage', '/api/archives/tasks'):
+        path = self.path.partition('?')[0]
+        if path in ('/api/editor/tasks', '/api/maps', '/api/maps/manage', '/api/archives/tasks',
+                    '/api/state', '/api/replay') or path.startswith('/api/csv/'):
             self.send_header('Cache-Control', 'no-store')
         self.end_headers()
         self.wfile.write(body)
@@ -155,7 +157,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(self.server.runner.layout)
         elif self.path in ('/api/state','/api/beds'):
             state = self.server.runner.snapshot()
-            self.reply(state if self.path.endswith('state') else state.get('beds',{}))
+            self.reply(self.server.workspace.visible_snapshot(state) if self.path.endswith('state') else state.get('beds',{}))
         elif self.path == '/api/stream':
             self.send_response(200)
             self.send_header('Content-Type','text/event-stream')
@@ -163,14 +165,15 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             try:
                 while not self.server.runner.stop_event.is_set():
-                    data=json.dumps(self.server.runner.snapshot(),ensure_ascii=False)
+                    state = self.server.workspace.visible_snapshot(self.server.runner.snapshot())
+                    data=json.dumps(state,ensure_ascii=False)
                     self.wfile.write(('data: '+data+'\n\n').encode())
                     self.wfile.flush()
                     time.sleep(.1)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
         elif self.path.startswith('/api/csv/'):
-            state = self.server.runner.snapshot()
+            state = self.server.workspace.visible_snapshot(self.server.runner.snapshot())
             kind = self.path.rsplit('/',1)[-1]
             rows = state.get('tasks',[]) if kind=='summary' else state.get('events',[])
             if kind=='arrivals':

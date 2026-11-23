@@ -90,13 +90,12 @@ const modelControls = document.createElement('span');
 modelControls.className = 'model-controls';
 modelTooltip.append(modelTitle,modelSize,modelGuide,modelControls);
 document.body.append(modelTooltip);
-let hoveredRoutePointer = null;
+let hoveredCanvasPointer = null;
 function hideModelTooltip() {
   modelTooltip.hidden = true;
-  hoveredRoutePointer = null;
+  hoveredCanvasPointer = null;
 }
 function showModelTooltip(object, x, y, fromCatalog=false) {
-  hoveredRoutePointer = null;
   modelTitle.textContent = object.kind==='bed' && !fromCatalog ? bedDisplayName(object,floor()) : object.name || labels[object.kind];
   const format = value => Number(value.toFixed(2));
   modelSize.textContent = format(object.width)+' × '+format(object.height)+' m';
@@ -1199,16 +1198,21 @@ function pickCanvasTaskBed(event) {
   const level=floor();
   const ground=world(event);
   const marker=hit(ground,object=>object.kind==='service');
-  let bed;
-  if (!marker && raisedView) {
-    const t=transform(), [x,y]=canvasPosition(event);
-    bed=level.objects.findLast(object=>object.kind==='bed' &&
-      containsPoint(object,groundPosition(x,y+(objectHeight(object)+.15)*t.cosEl*t.scale,t)));
-  }
-  bed=bed||hit(ground,object=>object.kind==='bed');
+  const bed=marker ? null : bedAtPointer(level,event,raisedView,transform(),.15);
   const service=marker||(bed&&level.objects.find(object=>object.kind==='service' && object.bed_id===bed.id));
   if (service) selectTaskBeds([service.id]);
   else if (bed) taskFeedback('该床位还未关联床旁服务点。');
+}
+function bedAtPointer(level, pointer, elevated, projection=transform(), topOffset=.28) {
+  const [x,y]=canvasPosition(pointer);
+  const ground=groundPosition(x,y,projection);
+  const beds=level.objects.filter(object=>object.kind==='bed');
+  if (elevated) {
+    const bed=beds.findLast(object=>containsPoint(object,
+      groundPosition(x,y+(objectHeight(object)+topOffset)*projection.cosEl*projection.scale,projection)));
+    if (bed) return bed;
+  }
+  return beds.findLast(object=>containsPoint(object,ground));
 }
 function pickCanvasTaskRoom(event) {
   const position=world(event);
@@ -1268,7 +1272,10 @@ function moveCameraDrag(event) {
 canvas.onpointermove = event => {
   if (buildingOverview) {
     const level = overviewFloorAt(canvasPosition(event));
+    hoveredCanvasPointer = event.pointerType==='mouse' && !event.buttons
+      ? {clientX:event.clientX,clientY:event.clientY} : null;
     if (level!==hoveredLevel) {hoveredLevel=level;updateCanvasCursor();draw();}
+    else refreshOverviewTooltip();
     return;
   }
   if (cameraDrag) {moveCameraDrag(event);return;}
@@ -1278,11 +1285,31 @@ canvas.onpointermove = event => {
     hideModelTooltip();
     return;
   }
-  if (!taskPicking && showTaskRouteTooltip(event)) return;
-  const object=hit(world(event));
-  if (object) showModelTooltip(object,event.clientX,event.clientY);
-  else hideModelTooltip();
+  hoveredCanvasPointer = {clientX:event.clientX,clientY:event.clientY};
+  refreshCanvasTooltip(bedVitalsOnFloor(floor(),visibleBedVitals()));
 };
+function refreshCanvasTooltip(results) {
+  const pointer=hoveredCanvasPointer;
+  if (!pointer) return;
+  const bed=bedAtPointer(floor(),pointer,raisedView);
+  const inspection=bed && results.get(bed.id);
+  if (inspection) {
+    showBedInspection(floor(),bed,inspection,pointer);
+    return;
+  }
+  if (!taskPicking && showTaskRouteTooltip(pointer)) return;
+  const object=bed || hit(world(pointer));
+  if (object) showModelTooltip(object,pointer.clientX,pointer.clientY);
+  else modelTooltip.hidden = true;
+}
+function showBedInspection(level, bed, inspection, pointer) {
+  const {status,measurements,reasons}=bedInspectionDetails(inspection);
+  modelTitle.textContent=bedDisplayName(bed,level);
+  modelSize.textContent=status;
+  modelGuide.textContent=measurements;
+  modelControls.textContent=reasons;
+  positionModelTooltip(pointer.clientX,pointer.clientY);
+}
 canvas.addEventListener('pointerleave',()=>{
   hideModelTooltip();
   if (buildingOverview && hoveredLevel) {hoveredLevel=null;updateCanvasCursor();draw();}
@@ -1392,7 +1419,6 @@ function showTaskRouteTooltip(pointer) {
   modelControls.textContent=[taskQueueStatus[task.status]||task.status,serviceTypes[spec.service],
     '优先级 '+taskPriorityLabels[taskPriorityLevel(spec.priority)],
     spec.deadline==null?'':'截止 '+spec.deadline+' 仿真秒'].filter(Boolean).join(' · ');
-  hoveredRoutePointer={clientX:pointer.clientX,clientY:pointer.clientY};
   positionModelTooltip(pointer.clientX,pointer.clientY);
   return true;
 }
@@ -1516,13 +1542,25 @@ function doorAtRoomLabel(position) {
   ctx.restore();
   return hitLabel;
 }
-function drawWallElevators(level,elevated=raisedView) {
+function drawElevatorEntrances(level,elevated) {
+  const snapshot = replay ? replay.snapshots[Number($('replaySlider').value)] : matchesCurrentMapRun() ? state : null;
+  const docked = new Set((snapshot?.elevators || []).filter(lift=>lift.floor_id===level.id).map(lift=>lift.id));
   for (const entrance of level.objects) {
-    if (entrance.kind!=='elevator' || !entrance.wall_id) continue;
+    if (entrance.kind!=='elevator') continue;
     const wall=level.objects.find(object=>object.id===entrance.wall_id);
-    if (!wall) continue;
-    const height=elevated?objectHeight(wall):0;
-    polygon(corners3({...entrance,height:Math.max(.32,entrance.height)},height),elevatorAccent,'#71421f');
+    if (entrance.wall_id && !wall) continue;
+    const footprint=wall ? {...entrance,height:Math.max(.32,entrance.height)} : entrance;
+    const height=elevated ? (wall ? objectHeight(wall) : .02) : 0;
+    const id=entrance.lift_id || entrance.shaft_id?.trim() || entrance.id;
+    const present=docked.has(id);
+    ctx.save();
+    if (present) {
+      ctx.shadowColor='#a6ff00';
+      ctx.shadowBlur=15;
+    }
+    polygon(corners3(footprint,height),present?'#c8ff33':elevatorAccent,present?'#456515':wall?'#71421f':null);
+    ctx.restore();
+    if (!wall && !elevated && entrance.id===selected) rectangle(entrance,'#e34d43',true);
   }
 }
 function wallElevatorAt(screenPosition,level) {
@@ -1595,8 +1633,8 @@ draw = function() {
   ctx.strokeStyle='#bdccce80';ctx.lineWidth=.5;
   for(let x=-f.width/2;x<=f.width/2;x+=1){ctx.beginPath();ctx.moveTo(...point(x,-f.height/2));ctx.lineTo(...point(x,f.height/2));ctx.stroke();}
   for(let y=-f.height/2;y<=f.height/2;y+=1){ctx.beginPath();ctx.moveTo(...point(-f.width/2,y));ctx.lineTo(...point(f.width/2,y));ctx.stroke();}
-  for(const object of f.objects.filter(o=>!['wall','bed','furniture','door'].includes(o.kind) && !(o.kind==='elevator' && o.wall_id))) {
-    const colors={forbidden:'#d77e7e66',one_way:'#d4bc6d77',single_lane:'#9aa9d888',service:'#43ad83',parking:'#6d8fb7',elevator:elevatorAccent,waiting:'#c8ad5c',exit:'#6caeb566'};
+  for(const object of f.objects.filter(o=>!['wall','bed','furniture','door','elevator'].includes(o.kind))) {
+    const colors={forbidden:'#d77e7e66',one_way:'#d4bc6d77',single_lane:'#9aa9d888',service:'#43ad83',parking:'#6d8fb7',waiting:'#c8ad5c',exit:'#6caeb566'};
     polygon(corners3(object,.02),colors[object.kind]||'#5aa597');
   }
   for(const route of preview.filter(r=>r.floor_id===f.id&&r.path.length)){ctx.strokeStyle='#278b70';ctx.lineWidth=2;ctx.beginPath();route.path.forEach((p,i)=>i?ctx.lineTo(...point(...p)):ctx.moveTo(...point(...p)));ctx.stroke();}
@@ -1615,6 +1653,7 @@ draw = function() {
   }
   const namedBeds = bedsWithServiceNames(f);
   for(const object of f.objects.filter(o=>(o.kind==='bed'&&!namedBeds.has(o.id))||o.asset==='nurse_station'||o.kind==='service')){const p=project3(object.x,object.y,object.kind==='service'?.1:objectHeight(object)+.6);ctx.fillStyle='#25424f';ctx.font='13px sans-serif';ctx.textAlign='center';ctx.fillText(object.name||labels[object.kind],p[0],p[1]-5);}
+  drawElevatorEntrances(f,true);
   drawFleet(f);
   const object=f.objects.find(o=>o.id===selected);
   if(object&&!replay&&(typeof workspaceAllowsEditing!=='function'||workspaceAllowsEditing())){polygon(corners3(object,0),null,'#ffb83b');if(!object.boundary_side){const controls=handles(object);for(const key of ['resize','rotate']){const [x,y]=point(...controls[key]);ctx.fillStyle='#fff6dd';ctx.strokeStyle='#b87717';ctx.beginPath();if(key==='rotate')ctx.arc(x,y,7,0,Math.PI*2);else ctx.rect(x-6,y-6,12,12);ctx.fill();ctx.stroke();}}}
@@ -1828,16 +1867,17 @@ function drawBuilding() {
       const solids=compiled.find(entry=>entry.id===level.id)?.rectangles ||
         level.objects.filter(object=>['wall','bed','furniture'].includes(object.kind));
       [...solids].sort((a,b)=>(-sinAz*b.x+cosAz*b.y)-(-sinAz*a.x+cosAz*a.y)).forEach(raisedObject);
-      drawBedVitals(level,latest,true);
+      const results = bedVitalsOnFloor(level,latest);
+      drawBedVitals(level,results,true);
+      drawElevatorEntrances(level,true);
       drawFleet(level,false);
-      drawWallElevators(level,true);
       if (active || hovered) polygon(corners3(slab,0),null,hovered?'#146759':'#2f6570');
       const slabPoints=[...corners3(slab,-.15),...corners3(slab,maxHeight)];
       const left=Math.max(0,Math.min(...slabPoints.map(point=>point[0]))-5);
       const right=Math.min(bodyWidth+32,Math.max(...slabPoints.map(point=>point[0]))+5);
       const top=Math.max(rowTop,Math.min(...slabPoints.map(point=>point[1]))-4);
       const bottom=Math.min(rowTop+rowHeight,Math.max(...slabPoints.map(point=>point[1]))+4);
-      overviewTargets.push({id:level.id,left,right,top,bottom});
+      overviewTargets.push({id:level.id,left,right,top,bottom,level,projection:t,results});
     } finally {ctx.restore();frameProjection=null;}
     const labelX=canvas.width-labelSpace-8;
     const labelHeight=Math.min(24,rowHeight*.9);
@@ -1854,6 +1894,25 @@ function drawBuilding() {
     rowTop += rowHeight+gap;
   }
   ctx.textBaseline='alphabetic';
+  refreshOverviewTooltip();
+}
+
+function refreshOverviewTooltip() {
+  const pointer=hoveredCanvasPointer;
+  if (pointer) {
+    const [x,y]=canvasPosition(pointer);
+    const target=overviewTargets.find(item=>item.results?.size &&
+      x>=item.left && x<=item.right && y>=item.top && y<=item.bottom);
+    if (target) {
+      const {level,projection,results}=target;
+      const bed=bedAtPointer(level,pointer,true,projection);
+      if (bed && results.has(bed.id)) {
+        showBedInspection(level,bed,results.get(bed.id),pointer);
+        return;
+      }
+    }
+  }
+  modelTooltip.hidden = true;
 }
 
 // Reuse the camera transform for all vertices and paths in a single frame.
@@ -1893,31 +1952,26 @@ function drawPerception(level) {
   }
 }
 function visibleBedVitals() {
-  return (replay || viewingCurrentRun()) ? latestVitals(state?.samples) : new Map();
+  return (replay || matchesCurrentMapRun()) ? latestVitals(state?.samples) : new Map();
 }
-function drawBedVitals(level,latest,elevated) {
-  if (!latest.size) return;
-  const beds = new Map();
-  for (const service of level.objects) {
-    if (service.kind!=='service' || !latest.has(service.id)) continue;
-    const id = service.bed_id || service.id;
-    const result = latest.get(service.id);
-    if (!beds.has(id) || beds.get(id).seq < result.seq) beds.set(id,result);
-  }
+function bedInspectionHeight(bed) {return objectHeight(bed)+.28;}
+function drawBedVitals(level,beds,elevated) {
+  if (!beds.size) return;
   ctx.save();
   ctx.font='600 12px sans-serif';
   ctx.textAlign='center';
   for (const object of level.objects) {
     if (!beds.has(object.id)) continue;
     const {color,label} = beds.get(object.id);
-    const height = elevated && object.kind==='bed' ? objectHeight(object)+.28 : .04;
+    const height = elevated && object.kind==='bed' ? bedInspectionHeight(object) : .04;
     polygon(corners3(object,height),color+'55');
     ctx.strokeStyle=color;
     ctx.lineWidth=3;
     ctx.stroke();
     const [x,y] = project3(object.x,object.y,height);
     ctx.fillStyle=color;
-    ctx.fillRect(x-17,y-8,34,16);
+    const width = ctx.measureText(label).width+10;
+    ctx.fillRect(x-width/2,y-8,width,16);
     ctx.fillStyle='#fff';
     ctx.fillText(label,x,y+4);
   }
@@ -1947,13 +2001,13 @@ draw = function() {
     drawWard();
     drawPerception(floor());
     drawTaskBedSelection(floor());
-    drawBedVitals(floor(),visibleBedVitals(),raisedView);
+    const results = bedVitalsOnFloor(floor(),visibleBedVitals());
+    drawBedVitals(floor(),results,raisedView);
     drawModelingGuides();
-    drawWallElevators(floor());
     drawDoorRoomLabels(floor());
     drawScaleBar(frameProjection.scale);
     drawFootprintPreview();
-    if (hoveredRoutePointer && !showTaskRouteTooltip(hoveredRoutePointer)) hideModelTooltip();
+    refreshCanvasTooltip(results);
   } finally {
     frameProjection = null;
   }

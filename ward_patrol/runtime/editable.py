@@ -13,6 +13,7 @@ from ward_patrol.runtime.dispatch_policy import DispatchPolicy
 from ward_patrol.runtime.elevator_risk import ElevatorRisk
 from ward_patrol.runtime.elevator import ElevatorExecution
 from ward_patrol.runtime.passage import PassageExecution
+from ward_patrol.runtime.parking import ParkingExecution
 from ward_patrol.runtime.perception import PerceptionExecution, sensor_settings
 from ward_patrol.runtime.planning import FleetPlanning
 from ward_patrol.simulation.dual_robot_demo import RobotState
@@ -156,7 +157,8 @@ def normalize_patrol_fields(record):
     return dict(beds=beds, count=count, period=period, task=spec)
 
 
-class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExecution, ElevatorExecution, PassageExecution, Runtime):
+class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExecution,
+                      ElevatorExecution, PassageExecution, Runtime):
     sim_dt = DT
     battery_use_per_meter = BATTERY_USE_PER_METER
     def __init__(self, document, models, instances, output='outputs/runs', gui=False, policy=None, local_sampling=False):
@@ -180,6 +182,8 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
         self.floors = {f['id']: f for f in document['floors']}
         self.floor_z = {floor_id: index*4 for index, floor_id in enumerate(self.floors)}
         self.services = {o['id']: (floor['id'], o) for floor in document['floors'] for o in floor['objects'] if o['kind']=='service'}
+        self.physical_beds = {(floor['id'], obj['id']): obj for floor in self.document['floors']
+                              for obj in floor['objects'] if obj['kind'] == 'bed'}
         self.ward = SimpleNamespace(kind=document['id'], stops=[(key, (obj['x'],obj['y'])) for key, (_, obj) in self.services.items()])
         self.robots = []
         self.robot_instances = {}
@@ -213,6 +217,7 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
         self.configure_planning()
         self.configure_floor_coverage()
         self.configure_elevator_risk()
+        self.configure_parking()
         (self.directory/'map.json').write_text(json.dumps(self.document,ensure_ascii=False),encoding='utf-8')
         (self.directory/'input.json').write_text(json.dumps(dict(map_id=document['id'],map_version=document['version'],map_digest=document.get('digest'),
             models=models,instances=instances,dt=DT,seed=1000,dispatch_policy=self.dispatch_policy.snapshot()),ensure_ascii=False),encoding='utf-8')
@@ -373,7 +378,8 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
 
     def available_battery(self, robot):
         charge, reserve = battery_limits(self.robot_instances[robot.robot_id])
-        return max(0., charge-robot.distance*BATTERY_USE_PER_METER), reserve
+        charge += self.recharged.get(robot.robot_id,0.)-robot.distance*BATTERY_USE_PER_METER
+        return max(0., min(100.,charge)), reserve
 
     def _set_dispatch_wait(self, task, reason, event='task_waiting'):
         if self.wait_reasons.get(task.task_id) != reason:
@@ -407,7 +413,7 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
             if task.bed_id in active:
                 self._set_dispatch_wait(task, '该床位正在执行另一项巡检')
                 continue
-            candidates, reasons = [], []
+            candidates, reasons, top_ups = [], [], []
             planned = self.dispatch_plan.get(task.task_id) if plan_valid else None
             plan_failed = False
             if planned and planned['sequence']!=queue_heads[planned['robot_id']]:
@@ -434,7 +440,7 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
                     reasons.append(f'{robot.robot_id} 电量 {charge:.1f}% 低于最低安全电量 {reserve:.1f}%')
                     plan_failed = bool(planned)
                     continue
-                deferred = bool(robot.task_id or robot.robot_id in self.elevator_requests or robot.robot_id in self.passage_escapes)
+                deferred = bool(robot.task_id or self.parking_preemption_blocked(robot))
                 origin,position,available = self.robot_floors[robot.robot_id],robot.xy,self.elapsed
                 if deferred:
                     reasons.append('车辆暂时繁忙（'+robot.robot_id+' 正在执行任务）')
@@ -459,8 +465,15 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
                     route,reason = None,'服务点必须设在窄通道外'
                 if route:
                     cost,distance,actions = route
-                    if charge-distance*BATTERY_USE_PER_METER < reserve-1e-9:
-                        reasons.append(f'{robot.robot_id} 电量不足，预计到站后低于最低安全电量 {reserve:.1f}%')
+                    can_charge = not deferred and charge<100. and self.charging_spot(robot) is not None
+                    required = self.parking_requirement(robot,model,floor_id,task.goal,distance,charge,reserve,
+                                                        allow_top_up=can_charge)
+                    if required>charge+1e-9:
+                        if can_charge and math.isfinite(required):
+                            top_ups.append((required-charge,robot.robot_id))
+                            reasons.append(f'{robot.robot_id} 等待补电至 {required:.1f}% 后可执行并返停')
+                        else:
+                            reasons.append(f'{robot.robot_id} 执行后无电量充足且安全可达的空闲停车点')
                         plan_failed = bool(planned)
                         continue
                     finish = available+cost+service
@@ -472,6 +485,8 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
                     reasons.append('本轮路径规划失败（'+robot.robot_id+'：'+reason+'）')
                     plan_failed = bool(planned)
             if not candidates:
+                if top_ups:
+                    self.charge_requested.add(min(top_ups)[1])
                 if plan_failed:
                     self._plan_key = None
                     plan_valid = False
@@ -482,6 +497,9 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
             if deferred:
                 self._set_dispatch_wait(task,'车辆暂时繁忙（'+robot.robot_id+' 正在执行任务）；优先等待同层车辆，减少乘梯并保留楼层覆盖')
                 continue
+            returning = self.leave_parking(robot)
+            if returning:
+                self._parking_event('parking_return_interrupted',robot,returning['spot'])
             task.status,task.robot_id,task.assigned_at='assigned',robot.robot_id,self.elapsed
             robot.task_id,robot.status=task.task_id,'moving'
             self.connect_robot_route(robot,actions)
@@ -493,12 +511,12 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
             if self._plan_job is not None:
                 self._plan_key = None
 
-    def finish(self, task, robot, reason):
+    def finish(self, task, robot, reason=None, **fields):
         self.last_dispatch = -math.inf
-        task.status,task.completed_at='completed',self.elapsed
-        self.emit('task_completed',robot,task,reason=reason)
-        robot.task_id,robot.path,robot.status=None,[],'idle'
-        robot.completed_tasks+=1
+        if reason is not None:
+            fields['reason'] = reason
+        super().finish(task,robot,**fields)
+        self.parking_pending.add(robot.robot_id)
         self.velocities[robot.robot_id]=0
         self.lidars[robot.robot_id].blocked_since = None
         self.lidars[robot.robot_id].replan_goal = None
@@ -507,7 +525,12 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
         super().receipt(message)
         self.last_dispatch = -math.inf
 
+    def sample_bed_info(self, bed):
+        floor_id, service = self.services[bed]
+        return self.physical_beds.get((floor_id, service.get('bed_id')))
+
     def advance_robot(self, robot):
+        self.advance_charging(robot)
         task = self.task_for(robot)
         self.replan_observed_path(robot,task)
         if robot.robot_id in self.passage_escapes:
@@ -516,6 +539,9 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
         if self.advance_passage_yield(robot,task):
             return
         if self.advance_elevator_route(robot,task):
+            return
+        if robot.robot_id in self.parking_moves:
+            self.advance_parking_move(robot,task)
             return
         if task is None:
             return
@@ -582,7 +608,7 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
             return
         if robot.status=='waiting':
             self.emit('robot_released',robot,task,reason='本步几何和车辆间距校验通过')
-        robot.status='moving'
+        robot.status='returning' if robot.robot_id in self.parking_moves else 'moving'
         robot.xy=position
         robot.distance+=step
         self.velocities[robot.robot_id]=0 if step>=distance-1e-9 else speed
@@ -599,6 +625,7 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
         if self.elapsed-self.last_dispatch>=.5:
             self.dispatch()
             self.last_dispatch=self.elapsed
+        self.start_parking_returns()
         self.advance_planning()
         self.rebalance_floor_coverage()
         for robot in self.robots:
@@ -631,6 +658,7 @@ class EditableRuntime(FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExec
             charge, reserve = self.available_battery(actual)
             robot.update(battery_percent=round(charge,2),safety_battery_percent=reserve)
             robot.update(floor_id=self.robot_floors[robot['id']],model_id=instance['model_id'],yaw=self.headings[robot['id']],speed=self.velocities[robot['id']])
+            robot.update(self.robot_parking_snapshot(robot['id']))
             request = self.elevator_requests.get(robot['id'])
             if request:
                 robot['elevator_id'] = request.ride.elevator_id

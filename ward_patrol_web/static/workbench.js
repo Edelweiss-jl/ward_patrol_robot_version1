@@ -110,6 +110,21 @@ function renderArchivedTasks() {
       button.onclick = ()=>openArchivedTaskRun(task.run_id).catch(error=>notice(error.message));
       playback.append(button);
     } else playback.textContent = '—';
+    const remove = workspaceElement('button','delete-task','删除任务');
+    remove.type = 'button';
+    remove.setAttribute('aria-label','删除任务 '+task.number);
+    remove.onclick = async()=>{
+      remove.disabled = true;
+      try {
+        const result = await deleteSavedTask(task,true);
+        if (result) await refreshArchivedTasks();
+      } catch(error) {
+        notice(error.message);
+      } finally {
+        remove.disabled = false;
+      }
+    };
+    row.insertCell().append(remove);
     return row;
   });
   $('archivedTaskRows').replaceChildren(...rows);
@@ -340,14 +355,18 @@ function renderWorkbench() {
     workspaceRenderStamp=stamp;
   }
   const robots=(facts.current||inReplay)?state?.robots||[]:[];
-  const robotStamp=JSON.stringify([documentMap.floors.map(level=>[level.id,level.name]),robots.map(robot=>[robot.id,robot.floor_id,robot.status,robot.battery_percent])]);
+  const robotStamp=JSON.stringify([documentMap.floors.map(level=>[level.id,level.name]),robots.map(robot=>[robot.id,robot.floor_id,robot.status,robot.battery_percent,robot.returning_to_parking])]);
   if(robotStamp!==workspaceRunStamp) {
     const rows=$('workspaceRobotRows');rows.replaceChildren();
-    const statuses={idle:'空闲',moving:'行驶中',servicing:'服务中',waiting:'等待',blocked:'受阻',assigned:'执行中',completed:'已完成'};
+    const statuses={idle:'空闲',moving:'行驶中',servicing:'服务中',waiting:'等待',blocked:'受阻',assigned:'执行中',completed:'已完成',
+      returning:'返回停车点',waiting_parking:'等待停车点',parked:'已停车',charging:'充电中',
+      waiting_elevator:'候梯',riding_elevator:'乘梯',waiting_elevator_exit:'等待出梯',exiting_elevator:'驶离电梯'};
     for(const robot of robots) {
       const row=workspaceElement('div','robot-state'),left=workspaceElement('div','',robot.id);
       left.append(workspaceElement('small','',documentMap.floors.find(level=>level.id===robot.floor_id)?.name||'跨层运行'));
-      row.append(left,workspaceElement('span','',(statuses[robot.status]||robot.status||'—')+' · '+(robot.battery_percent??'—')+'%'));rows.append(row);
+      const status=statuses[robot.status]||robot.status||'—';
+      const activity=robot.returning_to_parking&&robot.status!=='returning'?'返停 · '+status:status;
+      row.append(left,workspaceElement('span','',activity+' · '+(robot.battery_percent??'—')+'%'));rows.append(row);
     }
     if(!robots.length)rows.append(workspaceElement('p','muted','准备当前地图的巡查后，在这里查看车辆状态。'));
     workspaceRunStamp=robotStamp;

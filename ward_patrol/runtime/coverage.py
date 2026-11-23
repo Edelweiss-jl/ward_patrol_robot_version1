@@ -48,22 +48,28 @@ class FloorCoverage:
     def note_floor_arrival(self, identity, floor):
         self.relocation_until[identity] = self.elapsed+self.dispatch_policy.relocation_cooldown_seconds
 
-    def update_service_coverage(self):
-        ready = Counter()
+    def service_arrivals(self):
         readiness = {}
         for robot in self.robots:
             identity = robot.robot_id
             if not self.basic_service_capable(identity):
                 continue
-            if identity in self.passage_escapes or (not robot.task_id and identity in self.elevator_requests):
+            if identity in self.passage_escapes or (not robot.task_id and identity in self.elevator_requests
+                                                    and identity not in self.parking_moves):
                 continue
-            floor,_,distance,seconds = self._remaining_work(robot)
+            parking = self.parking_moves.get(identity)
+            cross_floor_return = bool(parking and parking['spot'][0]!=self.robot_floors[identity])
+            floor,_,distance,seconds = self._remaining_work(robot,include_parking=cross_floor_return)
             charge,reserve = self.available_battery(robot)
             if floor not in self.floors or charge-distance*self.battery_use_per_meter<=reserve+1e-9:
                 continue
             readiness[identity] = floor,seconds
-            if seconds<=self.dispatch_policy.coverage_ready_seconds:
-                ready[floor] += 1
+        return readiness
+
+    def update_service_coverage(self):
+        readiness = self.service_arrivals()
+        ready = Counter(floor for floor,seconds in readiness.values()
+                        if seconds<=self.dispatch_policy.coverage_ready_seconds)
         elapsed = max(0.,self.elapsed-self._coverage_monitor_time)
         for floor in self.floors:
             since = self.vacancy_since[floor]
@@ -215,6 +221,8 @@ class FloorCoverage:
             if obj['kind']=='parking' and owners.get((floor_id,obj['id'])) not in (None,robot.robot_id):
                 continue
             point = obj['x'],obj['y']
+            if obj['kind']=='parking' and not self._parking_open(robot,(floor_id,obj['id'])):
+                continue
             if not planner.free(point) or any(gate.floor_id==floor_id and
                 planner.inside(point,gate.region,planner.radius) for gate in self.passages.values()):
                 continue
@@ -258,7 +266,8 @@ class FloorCoverage:
             return
         check = (tuple(sorted(projected.items())),tuple(missing),tuple(counts.items()),tuple(self.coverage_targets.items()),
                  self.planning_environment(),self.policy_revision,self.elevator_risk_revision,
-                 tuple((r.robot_id,r.xy,r.robot_id in self.elevator_requests,r.robot_id in self.passage_escapes,
+                 tuple((r.robot_id,r.xy,r.robot_id in self.parking_pending or r.robot_id in self.parking_moves,
+                        r.robot_id in self.elevator_requests,r.robot_id in self.passage_escapes,
                         self.relocation_until.get(r.robot_id,0.)>self.elapsed,round(self.available_battery(r)[0],6))
                        for r in self.robots if not r.task_id))
         if check!=self._coverage_check:
@@ -279,7 +288,8 @@ class FloorCoverage:
         reasons = set()
         for robot in self.robots:
             identity = robot.robot_id
-            if (robot.task_id or identity in self.elevator_requests or identity in self.passage_escapes or
+            if (robot.task_id or identity in self.parking_moves or identity in self.parking_pending or
+                robot.status=='charging' or identity in self.elevator_requests or identity in self.passage_escapes or
                 counts[projected[identity]]<=1):
                 continue
             if not self.basic_service_capable(identity):
@@ -318,7 +328,8 @@ class FloorCoverage:
                         yield
                         continue
                     seconds,distance,actions = route
-                    if counts[destination]==0 and not urgent and incoming<=seconds+self.dispatch_policy.support_gain_seconds:
+                    wait_margin = 0. if urgent else self.dispatch_policy.support_gain_seconds
+                    if counts[destination]==0 and incoming<=seconds+wait_margin:
                         reasons.add('本层车辆将先于补位车辆恢复服务')
                         yield
                         continue
@@ -329,8 +340,9 @@ class FloorCoverage:
                             reasons.add('额外支援的预计收益不足以抵消跨层开销')
                             yield
                             continue
-                    if charge-distance*self.battery_use_per_meter<reserve-1e-9:
-                        reasons.add('补位后电量将低于安全下限')
+                    required = self.parking_requirement(robot,model,destination,point,distance,charge,reserve)
+                    if required>charge+1e-9:
+                        reasons.add('补位后缺少电量充足且可达的停车点')
                         yield
                         continue
                     score = (self.elevator_rides(actions),obj['kind']!='parking',seconds,distance,identity,destination,obj['id'])

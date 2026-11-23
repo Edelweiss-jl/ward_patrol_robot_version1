@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import random
+import re
 import zlib
 
 from . import protocol
@@ -29,6 +30,40 @@ SCENARIOS = {
     "hypotension": [("systolic_bp", "low", "severe"),
                     ("diastolic_bp", "low", "mild")],
 }
+
+# 诊断关键词只用于选择模拟情景。体征范围和分级仍来自配置。
+DIAGNOSIS_TERMS = {
+    "hypoxia": ("低氧", "肺炎", "慢阻肺", "慢性阻塞性肺", "哮喘", "copd", "hypoxia", "pneumonia", "asthma"),
+    "hypertension": ("高血压", "hypertension"),
+    "fever": ("发热", "高热", "感染", "fever", "infection"),
+    "bradycardia": ("心动过缓", "心率过缓", "bradycardia"),
+    "hypotension": ("低血压", "hypotension"),
+}
+
+
+def _diagnosis_scenarios(profile):
+    diagnosis = profile.get("diagnosis")
+    if not isinstance(diagnosis, str):
+        return set()
+    clauses = re.split(r"[,，、;；。\n]+", diagnosis.casefold())
+    positive = [part.strip() for part in clauses if part.strip()
+                and not part.strip().startswith(("无", "否认", "排除", "no "))]
+    return {scenario for scenario, terms in DIAGNOSIS_TERMS.items()
+            if any(term in part for term in terms for part in positive)}
+
+
+def _normal_modes(profile, scenarios):
+    age = profile.get("age")
+    shifts = {}
+    if type(age) is int and 0 <= age < 13:
+        shifts.update(heart_rate=.25, respiratory_rate=.25, systolic_bp=-.2, diastolic_bp=-.15)
+    elif type(age) is int and 65 <= age <= 130:
+        shifts.update(systolic_bp=.2, spo2=-.15)
+    for scenario in sorted(scenarios):
+        for key, direction, _ in SCENARIOS[scenario]:
+            shift = .18 if direction == "high" else -.18
+            shifts[key] = shifts.get(key, 0) + shift
+    return {key: min(.95, max(.05, .5 + shift)) for key, shift in shifts.items()}
 
 
 def _decimals(spec):
@@ -62,9 +97,9 @@ class VitalsGenerator:
         base = int(self.seed) if self.seed is not None else 0
         return random.Random(base + zlib.crc32(str(bed_id).encode("utf-8")) + int(seq) * 7919)
 
-    def _normal(self, spec, rng):
-        lo, hi = spec["normal"]
-        value = rng.uniform(float(lo), float(hi))
+    def _normal(self, spec, rng, mode=None):
+        lo, hi = map(float, spec["normal"])
+        value = rng.uniform(lo, hi) if mode is None else rng.triangular(lo, hi, lo + (hi - lo) * mode)
         return _round(spec, value)
 
     def _band(self, spec, direction, critical):
@@ -93,24 +128,35 @@ class VitalsGenerator:
         return _round(spec, rng.uniform(lo, hi))
 
     def generate(self, bed_id, seq=0, robot_id=None, sim_time=None,
-                 abnormal=None, critical=None, scenario=None):
+                 abnormal=None, critical=None, scenario=None, profile=None):
         """生成一次采样，返回 protocol.vitals_message 格式的消息。
 
         abnormal / critical / scenario 可显式指定，便于演示与测试；
-        不指定时按配置的异常率抽取。
+        提供患者年龄和诊断时，调整正常区间内的取值与异常情景的采样权重。
         """
         seq = int(seq)
         rng = self._rng(bed_id, seq)
+        profile = profile if isinstance(profile, dict) else {}
+        pool = [s for s in self.scenarios if s in SCENARIOS] or ["hypoxia"]
+        matching = _diagnosis_scenarios(profile).intersection(pool)
+        modes = _normal_modes(profile, matching)
         chosen_scenario = "routine"
         touched = {}
 
         if abnormal is None:
-            abnormal = rng.random() < self.abnormal_rate
+            rate = self.abnormal_rate
+            if matching:
+                rate = 2 * rate / (1 + rate)
+            abnormal = rng.random() < rate
         if abnormal:
             if critical is None:
                 critical = rng.random() < self.critical_ratio
-            pool = [s for s in self.scenarios if s in SCENARIOS]
-            chosen_scenario = scenario if scenario in SCENARIOS else rng.choice(pool or ["hypoxia"])
+            if scenario in SCENARIOS:
+                chosen_scenario = scenario
+            elif matching:
+                chosen_scenario = rng.choices(pool, weights=[8 if s in matching else 1 for s in pool])[0]
+            else:
+                chosen_scenario = rng.choice(pool)
             for key, direction, severity in SCENARIOS[chosen_scenario]:
                 spec = self.metrics.get(key)
                 if spec is None:
@@ -122,7 +168,7 @@ class VitalsGenerator:
 
         vitals = {}
         for key, spec in self.metrics.items():
-            vitals[key] = touched.get(key) if key in touched else self._normal(spec, rng)
+            vitals[key] = touched[key] if key in touched else self._normal(spec, rng, modes.get(key))
 
         return protocol.vitals_message(bed_id, vitals, chosen_scenario,
                                        robot_id=robot_id, seq=seq, sim_time=sim_time)

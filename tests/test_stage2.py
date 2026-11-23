@@ -9,6 +9,8 @@ from unittest.mock import patch
 import pybullet as bullet
 from ward_patrol.maps.geometry import blank_map, DEFAULT_MODELS, Planner, MapStore, validate, compile_floor, copy_floor, legacy_map
 from ward_patrol.runtime.editable import EditableRuntime
+from ward_patrol.runtime.vitals import SimulatedVitals
+from ward_patrol_vitals_mqtt.vitals_mqtt import load_config
 from ward_patrol_web.workspace import TaskBedConflict, Workspace
 
 
@@ -102,6 +104,38 @@ class Stage2Tests(unittest.TestCase):
                 core.advance()
                 self.assertEqual(sum(e['event']=='task_completed' for e in core.events),1)
             finally:core.close()
+
+    def test_bedside_service_uses_the_linked_bed_record(self):
+        for status in ('occupied', 'vacant', ''):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as root:
+                document = scene(3)
+                bed = document['floors'][0]['objects'][2]
+                bed['bed_status'] = status
+                if status == 'occupied':
+                    bed['patient'] = dict(age=70, diagnosis='高血压', name='测试患者', id='P-1', sex='unknown')
+                core = EditableRuntime(document, DEFAULT_MODELS, instances(1), output=root)
+                try:
+                    core.submit(dict(action='create_task', bed='S0', task=dict(service='mqtt')))
+                    for _ in range(5000):
+                        core.advance()
+                        if core.samples:
+                            break
+                    sample, = core.samples.values()
+                    if status == 'occupied':
+                        request, = core.outbox
+                        self.assertEqual(request['profile'], dict(age=70, diagnosis='高血压'))
+                        result = SimulatedVitals(load_config()).sample(request)
+                        core.submit(dict(action='receipt', payload=result))
+                        core.advance()
+                        self.assertEqual(len(sample['result']['vitals']), 6)
+                    else:
+                        self.assertFalse(core.outbox)
+                        self.assertNotIn('vitals', sample['result'])
+                        self.assertEqual(sample['result']['verdict']['status'], status or 'unrecorded')
+                    self.assertTrue(sample['accepted'])
+                    self.assertEqual(core.tasks[0].status, 'completed')
+                finally:
+                    core.close()
 
     def test_dispatch_prefers_priority_then_earliest_deadline(self):
         with tempfile.TemporaryDirectory() as root:
@@ -422,6 +456,72 @@ class Stage2Tests(unittest.TestCase):
             replacement = workspace.save_editor_task(dict(data,request_id='b'*32),runner)
             self.assertNotEqual(replacement['id'],record['id'])
             self.assertEqual(replacement['display_number'],record['id'])
+
+    def test_deleted_patrol_is_removed_from_live_and_replay_results(self):
+        with tempfile.TemporaryDirectory() as root:
+            workspace = Workspace(root)
+            data = dict(map_id='corridor',request_id='a'*32,beds=['N1-1'],count=1,period=0)
+            record = workspace.save_editor_task(data)
+            run_id = 'd'*32
+            stored = workspace._task_records()
+            stored[record['id']].update(status='published',run_id=run_id)
+            workspace._write_json(workspace.task_queue_path,stored)
+
+            pending = dict(task_id='T1',bed_id='N1-1',status='assigned')
+            other = dict(task_id='T2',bed_id='N1-1',status='completed')
+            specs = {'T1':dict(patrol_id=record['id']), 'T2':dict(patrol_id='another-patrol')}
+            first = dict(run_id=run_id,map_id='corridor',tasks=[pending,other],task_specs=specs,
+                         robots=[dict(id='R1',task_id='T1',path=[[1,0]],status='moving'),
+                                 dict(id='R2',task_id='T2',path=[[2,0]],status='moving')],
+                         dispatch_plan={'T1':{},'T2':dict(group_id='T1',group_position=2)},
+                         robot_queues={'R1':['T1','T2']})
+            samples = {key:dict(request=dict(task_id=task_id,bed_id='N1-1'),accepted=True,
+                                result=dict(vitals=dict(heart_rate=rate)))
+                       for key,task_id,rate in [('other','T2',70),('remove','T1',95),('manual',None,80)]}
+            events = [dict(event='patrol_created',patrol_id=record['id'],task_id='T1',visit_task_ids=['T1']),
+                      dict(event='sample_requested',sample_id='remove'),
+                      dict(event='receipt_duplicate',sample_id='remove'),
+                      dict(event='vitals_received',task_id='T1',sample_id='remove'),
+                      dict(event='vitals_received',task_id='T2',sample_id='other'),
+                      dict(event='vitals_received',sample_id='manual')]
+            last = dict(first,tasks=[dict(pending,status='completed'),other],samples=samples)
+            state = dict(last,events=events)
+            runner = type('Runner', (), {'snapshot': lambda self: state})()
+
+            def save_replay(identity, frames, timeline):
+                folder = Path(root,'runs',identity)
+                folder.mkdir(parents=True)
+                (folder/'map.json').write_text(json.dumps(dict(id='corridor')),encoding='utf-8')
+                (folder/'input.json').write_text('{}',encoding='utf-8')
+                for filename, entries in [('snapshots.jsonl',frames),('events.jsonl',timeline)]:
+                    (folder/filename).write_text(''.join(json.dumps(entry)+'\n' for entry in entries),encoding='utf-8')
+
+            save_replay(run_id,[dict(first,task_specs={}),last],events)
+            unrelated = 'e'*32
+            save_replay(unrelated,[dict(last,task_specs={'T1':dict(patrol_id='other-run-patrol')})],[])
+            workspace.delete_editor_task(record,runner)
+            archived, = workspace.archived_tasks()
+            self.assertIn('remove',workspace.visible_snapshot(state)['samples'])
+            self.assertEqual(workspace.delete_editor_task(archived,runner,permanent=True),{'deleted':True})
+
+            workspace = Workspace(root)
+            visible = workspace.visible_snapshot(state)
+            replay = workspace.read_run(run_id)
+            self.assertEqual(visible['events'],events[-2:])
+            self.assertEqual(replay['events'],visible['events'])
+            for frame in (visible, *replay['snapshots']):
+                self.assertEqual(frame['tasks'],[other])
+                self.assertEqual(frame['robots'][0]['path'],[])
+                self.assertIsNone(frame['robots'][0]['task_id'])
+                self.assertEqual(frame['robots'][1]['path'],[[2,0]])
+                self.assertEqual(frame['dispatch_plan'],{'T2':dict(group_id='T2',group_position=1)})
+                self.assertEqual(frame['robot_queues'],{'R1':['T2']})
+                self.assertNotIn('T1',frame['task_specs'])
+            self.assertEqual(set(visible['samples']),{'manual','other'})
+            self.assertEqual(visible['samples'],replay['snapshots'][-1]['samples'])
+            self.assertEqual(workspace.read_run(unrelated)['snapshots'][0]['samples'],samples)
+            self.assertEqual(state['samples'],samples)
+            self.assertEqual(workspace.archived_tasks(),[])
 
     def test_reuses_both_deleted_display_numbers_without_reusing_published_ids(self):
         with tempfile.TemporaryDirectory() as root, patch('ward_patrol_web.workspace.datetime') as clock:

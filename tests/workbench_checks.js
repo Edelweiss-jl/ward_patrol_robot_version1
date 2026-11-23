@@ -108,4 +108,74 @@ vm.runInContext(`
   compileRevision++;
   assert.deepEqual(resolveTaskChoice('一层 / 101','room').beds.map(bed=>bed.id),['a','b']);
 `,roomControls);
-process.stdout.write('Workbench readiness and mode guards passed.');
+const vitalsSource=fs.readFileSync(path.join(__dirname,'../ward_patrol_web/static/vitals.js'),'utf8');
+const furnishingSource=fs.readFileSync(path.join(__dirname,'../ward_patrol_web/static/furnishing.js'),'utf8');
+const tooltipContext=vm.createContext({assert});
+vm.runInContext(vitalsSource,tooltipContext);
+vm.runInContext(furnishingSource.slice(furnishingSource.indexOf('function refreshCanvasTooltip('),
+  furnishingSource.indexOf("canvas.addEventListener('pointerleave'")),tooltipContext);
+vm.runInContext(`
+  const bed={id:'bed1',name:'01 床',kind:'bed'};
+  const level={objects:[bed,{id:'S1',kind:'service',bed_id:'bed1'},{id:'S2',kind:'service',bed_id:'bed1'}]};
+  const floor=()=>level, bedAtPointer=()=>bed, bedDisplayName=object=>object.name;
+  const modelTitle={}, modelSize={}, modelGuide={}, modelControls={};
+  const positionModelTooltip=()=>{};
+  const hoveredCanvasPointer={clientX:10,clientY:10}, raisedView=true, taskPicking=false;
+  const showTaskRouteTooltip=()=>{throw Error('已巡检的床位应优先显示巡检结果');};
+  const sample=(bed_id,seq,result,accepted=true)=>({request:{bed_id,seq,sim_time:seq},accepted,result});
+  const occupied={bed_status:'occupied',verdict:{status:'warning',reasons:['血氧偏低']},vitals:{spo2:93}};
+  const vacant={bed_status:'vacant',verdict:{status:'vacant'}};
+  const samples={newer:sample('S2',2,vacant),older:sample('S1',1,occupied),pending:sample('S2',3,occupied,false)};
+  refreshCanvasTooltip(bedVitalsOnFloor(level,latestVitals(samples)));
+  assert.equal(modelTitle.textContent,'01 床');
+  assert.equal(modelSize.textContent,'空床位 · 巡检于仿真 2.0 秒');
+  assert.equal(modelGuide.textContent,'');
+  refreshCanvasTooltip(bedVitalsOnFloor(level,latestVitals({older:samples.older})));
+  assert.equal(modelSize.textContent,'已有入住 · 预警 · 巡检于仿真 1.0 秒');
+  assert.equal(modelGuide.textContent,'血氧 93%');
+  assert.equal(modelControls.textContent,'血氧偏低');
+`,tooltipContext);
+const elevatorContext=vm.createContext({assert});
+vm.runInContext(furnishingSource.slice(furnishingSource.indexOf('function drawElevatorEntrances('),
+  furnishingSource.indexOf('function wallElevatorAt(')),elevatorContext);
+vm.runInContext(`
+  const elevatorAccent='#a96a3a', selected=null, painted=[];
+  const ctx={save(){},restore(){this.shadowBlur=0;}};
+  const corners3=(object,height)=>[object.id,height];
+  const polygon=([id,height],color)=>painted.push({id,height,glowing:!!ctx.shadowBlur,color});
+  const objectHeight=wall=>wall.z;
+  const $=()=>({value:'0'});
+  let replay=null, matching=true;
+  const matchesCurrentMapRun=()=>matching;
+  const state={elevators:[{id:'E1',floor_id:'F1'},{id:'E2',floor_id:'F2'}]};
+  const first={id:'F1',objects:[{id:'wall',kind:'wall',z:1.5},
+    {id:'east-first',kind:'elevator',lift_id:'E1',wall_id:'wall',height:.2}]};
+  const second={id:'F2',objects:[{id:'east-second',kind:'elevator',lift_id:'E1'},
+    {id:'west-second',kind:'elevator',shaft_id:' E2 '}]};
+  const highlighted=()=>painted.splice(0).filter(entry=>entry.glowing).map(entry=>entry.id);
+
+  drawElevatorEntrances(first,true);
+  assert.equal(painted[0].height,1.5);
+  assert.notEqual(painted[0].color,elevatorAccent);
+  drawElevatorEntrances(second,true);
+  assert.deepEqual(highlighted(),['east-first','west-second']);
+
+  state.elevators[0]= {id:'E1',floor_id:null,destination_floor_id:'F2'};
+  drawElevatorEntrances(first,false);
+  drawElevatorEntrances(second,false);
+  assert.deepEqual(highlighted(),['west-second']);
+
+  state.elevators[0].floor_id='F2';
+  drawElevatorEntrances(first,false);
+  drawElevatorEntrances(second,false);
+  assert.deepEqual(highlighted(),['east-second','west-second']);
+
+  matching=false;
+  drawElevatorEntrances(second,false);
+  assert.deepEqual(highlighted(),[]);
+  replay={snapshots:[{elevators:[{id:'E1',floor_id:'F1'}]}]};
+  drawElevatorEntrances(first,true);
+  drawElevatorEntrances(second,true);
+  assert.deepEqual(highlighted(),['east-first']);
+`,elevatorContext);
+process.stdout.write('Workbench readiness, mode guards, bed inspections, and elevator highlights passed.');

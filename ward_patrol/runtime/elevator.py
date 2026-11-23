@@ -125,8 +125,9 @@ def path_length(path):
     return sum(math.dist(start,end) for start,end in zip(path,path[1:]))
 
 
-def cross_floor_route(elevators, levels, planners, model, origin, start, destination, goal, wait_budgets=None):
-    """Dijkstra over landings: minimize rides, then estimated travel time."""
+def cross_floor_route(elevators, levels, planners, model, origin, start, destination, goal, wait_budgets=None,
+                      *, fastest=False):
+    """Search by ride count for patrols or by estimated travel time for parking."""
     source, target = (origin, 'start', ''), (destination, 'goal', '')
     nodes = {source:start, target:goal}
     passages = {}
@@ -160,10 +161,10 @@ def cross_floor_route(elevators, levels, planners, model, origin, start, destina
 
     order = count()
     best = {source:(0,0.)}
-    queue = [(0,0., next(order), source, (), 0.)]
+    queue = [(best[source],next(order),source,(),0,0.,0.)]
     while queue:
-        rides, cost, _, node, actions, distance = heappop(queue)
-        if (rides,cost) != best[node]:
+        rank,_,node,actions,rides,cost,distance = heappop(queue)
+        if rank != best[node]:
             continue
         if node == target:
             return cost, distance, actions
@@ -194,9 +195,10 @@ def cross_floor_route(elevators, levels, planners, model, origin, start, destina
         for candidate, seconds, meters, action in edges:
             new_cost = cost+seconds
             new_rides = rides+isinstance(action,Ride)
-            if (new_rides,new_cost) < best.get(candidate,(math.inf,math.inf)):
-                best[candidate] = new_rides,new_cost
-                heappush(queue,(new_rides,new_cost,next(order),candidate,(*actions,action),distance+meters))
+            rank = (new_cost,new_rides) if fastest else (new_rides,new_cost)
+            if rank < best.get(candidate,(math.inf,math.inf)):
+                best[candidate] = rank
+                heappush(queue,(rank,next(order),candidate,(*actions,action),new_rides,new_cost,distance+meters))
     return None
 
 
@@ -230,7 +232,7 @@ class ElevatorExecution:
             self.floor_planners[key] = Planner(self.floors[floor], model, extra_rectangles=self.closures_on(floor))
         return self.floor_planners[key]
 
-    def find_robot_route(self, robot, model, destination, goal, origin=None):
+    def find_robot_route(self, robot, model, destination, goal, origin=None, *, fastest=False):
         origin = origin or self.robot_floors[robot.robot_id]
         if origin == destination:
             baseline = self.planners[robot.robot_id] if origin==self.robot_floors[robot.robot_id] else None
@@ -244,7 +246,7 @@ class ElevatorExecution:
             return None, '未配置连接楼层的电梯'
         planners = {floor:self.planning_on(floor,model) for floor in self.floors}
         route = cross_floor_route(self.elevators,self.floor_levels,planners,model,origin,robot.xy,destination,goal,
-                                  wait_budgets=self.elevator_wait_budgets())
+                                  wait_budgets=self.elevator_wait_budgets(),fastest=fastest)
         return route, '未找到可用的跨层路线，检查电梯服务楼层、运行状态和通行几何'
 
     def connect_robot_route(self, robot, actions):
@@ -319,6 +321,8 @@ class ElevatorExecution:
             robot = self.by_robot[request.robot_id]
             task = self.task_for(robot)
             if task:
+                if self.parking_route_failed(robot,task):
+                    return
                 task.status,task.robot_id,task.assigned_at = 'pending',None,None
                 robot.task_id,robot.status,robot.path = None,'idle',[]
                 self._set_dispatch_wait(task,'原电梯不可用，等待重新规划')
@@ -338,7 +342,7 @@ class ElevatorExecution:
             else:
                 self._drop_elevator_request(lift,request)
         for robot in self.robots:
-            if robot.task_id is None:
+            if self.task_for(robot) is None:
                 self.route_actions.pop(robot.robot_id,None)
 
     def advance_elevator_route(self, robot, task):

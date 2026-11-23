@@ -8,8 +8,9 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--beds',nargs='+',default=['N1-1','S3-2'])
     parser.add_argument('--timeout',type=float,default=120)
+    parser.add_argument('--output',default='outputs/runs',help='运行记录和床位资料 beds.json 所在目录')
     args=parser.parse_args()
-    core=Runtime()
+    core=Runtime(output=args.output)
     link=None
     try:
         link=SamplingLink(core)
