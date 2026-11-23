@@ -1,0 +1,60 @@
+:root {
+  --ink: #193542;
+  --line: #d4e0e3;
+  --teal: #116c65;
+}
+body {
+  margin: 0;
+  background: #eff4f5;
+  color: var(--ink);
+  font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  padding: 16px clamp(14px, 2vw, 32px);
+  background: linear-gradient(105deg, #142e3c, #204952);
+  color: white;
+  border-bottom: 3px solid #63b5a8;
+}
+header h1 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: .04em; }
+header a {
+  order: 2; margin: 0 0 0 auto; padding: 5px 11px;
+  border: 1px solid #76949c; border-radius: 6px;
+  color: white; text-decoration: none; font-size: 13px;
+}
+header a:hover { background: #345962; }
+main { padding: clamp(10px, 1.4vw, 22px); gap: 16px; align-items: start; }
+main > *, aside > * { min-width: 0; }
+section, .panel {
+  padding: 15px; border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 2px 7px #19354209;
+}
+h2 { margin: 0 0 12px; color: var(--ink); font-size: 16px; letter-spacing: .02em; }
+button, input, select, textarea {
+  box-sizing: border-box; max-width: 100%; font: inherit;
+  border: 1px solid #b9cbd0; border-radius: 6px; color: var(--ink);
+}
+button { background: #fff; cursor: pointer; }
+button:not(:disabled):hover { border-color: #6c9996; }
+button.primary, #create { background: var(--teal); border-color: var(--teal); color: white; }
+button:disabled { cursor: default; opacity: .55; }
+:where(button, a, select, input, textarea, summary):focus-visible { outline: 3px solid #26878d; outline-offset: 2px; }
+.viewport, #catalog { border: 1px solid var(--line); border-radius: 9px; }
+#catalog { background: #eef4f4; }
+.item-card { border-radius: 7px; }
+.monitor main { grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); }
+.monitor #status { padding: 9px clamp(14px, 2vw, 32px); background: #e1eeeb; color: #24514f; }
+.monitor canvas { display: block; box-sizing: border-box; border: 1px solid var(--line); margin-bottom: 14px; }
+.monitor section h2:not(:first-child) { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.monitor section a { color: var(--teal); text-underline-offset: 3px; }
+.monitor th { color: #526872; background: #f3f7f8; text-align: left; }
+.monitor pre { overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 760px) {
+  .monitor main, main { grid-template-columns: minmax(0, 1fr); }
+  aside { grid-template-columns: minmax(0, 1fr); }
+  section, .panel { padding: 11px; }
+}

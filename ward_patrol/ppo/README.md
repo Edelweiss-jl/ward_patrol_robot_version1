@@ -26,6 +26,8 @@
 
 默认读取 `artifacts/ppo_artifacts/` 的策略或模型，演示报告写入 `outputs/demo_outputs/`。训练/评估/绘图脚本集中在本目录；参数以各入口 `--help` 为准。新训练使用新的输出目录，例如：
 
+`ppo_patrol_demo.py` 也支持在 PyCharm 中直接运行脚本。它的默认模型和报告路径按脚本位置定位到项目根目录，不受运行工作目录影响；显式传入的 `--model`、`--report` 和 `--screenshot` 相对路径仍相对于当前工作目录。
+
 ```powershell
 .\venv\Scripts\python.exe -m ward_patrol.ppo.train_ppo_patrol --steps 40000 --output artifacts/ppo_new_run
 ```

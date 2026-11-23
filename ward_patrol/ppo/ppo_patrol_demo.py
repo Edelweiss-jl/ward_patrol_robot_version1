@@ -8,19 +8,33 @@ import pybullet as p
 from stable_baselines3 import PPO
 import torch
 
-from ward_patrol.ppo.ppo_patrol_env import PatrolPPOEnv
+if __package__ in (None, ""):
+    # 支持 IDE 按脚本路径直接运行，不修改 sys.path。
+    from ppo_patrol_env import PatrolPPOEnv
+else:
+    from ward_patrol.ppo.ppo_patrol_env import PatrolPPOEnv
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model",default="artifacts/ppo_artifacts/ppo_patrol.zip")
+    parser.add_argument("--model",default=str(PROJECT_ROOT / "artifacts/ppo_artifacts/ppo_patrol.zip"))
     parser.add_argument("--controller",choices=("ppo","astar"),default="ppo")
     parser.add_argument("--mode",choices=("static","dynamic"),default="dynamic")
     parser.add_argument("--seed",type=int,default=1000)
     parser.add_argument("--headless",action="store_true")
-    parser.add_argument("--report",default="outputs/demo_outputs/ppo_demo_report.json")
+    parser.add_argument("--report",default=str(PROJECT_ROOT / "outputs/demo_outputs/ppo_demo_report.json"))
     parser.add_argument("--screenshot",help="Save initial scene PNG")
     args = parser.parse_args()
+    if args.controller == "ppo":
+        model_path = Path(args.model)
+        if not model_path.is_file() and model_path.suffix != ".zip":
+            model_path = Path(str(model_path) + ".zip")
+        if not model_path.is_file():
+            parser.error(f"Model file not found: {model_path.resolve()}; use --model to select a trained model")
+        args.model = str(model_path)
     torch.set_num_threads(1)
     model = PPO.load(args.model,device="cpu") if args.controller=="ppo" else None
     env = PatrolPPOEnv(args.mode,"rgb_array" if args.headless else "human")

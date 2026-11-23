@@ -9,6 +9,11 @@
 | test_adaptive_patrol.py | 自适应规划、初始化、模式切换及策略运行 |
 | test_ppo_patrol.py | 单机器人 Gym 契约、真实模型和评估记录 |
 | test_dual_ppo.py | 双机器人环境、联合模型和错误模型拒绝 |
+| test_fast_dispatch.py | 床位预排队列、连续路径安全、累计电量、跨层、封路与优先级失效重排 |
+| test_floor_coverage.py | 同层接续、保留各层车辆、减少乘梯、任务结束补位及新任务/电梯异常时安全释放 |
+| test_rolling_dispatch.py | 服务空窗、工作量目标、延迟与稳定期、电梯等待区间/样本、共享占用、真实路径分组及限时交换回退 |
+| test_elevator_catalog.py | 电梯统一停靠、旧格式转换与通行限制、复制确认、版本保存、编辑器数据契约及新格式跨层执行 |
+| test_workbench.py | 工作台首页与兼容路由、历史摘要、流程准备状态、车辆引用及只读分区编辑限制 |
 
 在根目录执行全部测试：
 

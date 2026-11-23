@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><title>病区巡查</title>
+<style>body{margin:24px;background:#f2f5f7;color:#233542;font:16px system-ui}button,select,input{font:inherit;padding:8px;margin:4px}main{display:grid;grid-template-columns:2fr 1fr;gap:20px}canvas{width:100%;background:white;border-radius:12px}section{background:white;padding:16px;border-radius:12px}pre{white-space:pre-wrap;max-height:400px;overflow:auto}label{display:block}a{margin-right:12px}#status{padding:12px}table{border-collapse:collapse;width:100%}td,th{padding:8px;border-bottom:1px solid #ddd}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/console.css">
+<body class="monitor">
+<header><h1>病区巡查简易监控</h1><a href="/">返回巡查工作台</a></header><div id="status">连接中</div>
+<main><div><canvas id="map" width="1000" height="760"></canvas><section><h2>任务</h2><table><thead><tr><th>任务</th><th>床位</th><th>车辆</th><th>状态</th></tr></thead><tbody id="tasks"></tbody></table></section></div>
+<section><label>床位 <select id="bed"></select></label><button id="create">创建巡查任务</button><button id="sample">手动采样</button><div><button id="pause">暂停</button><button id="resume">继续</button><label>倍速 <select id="speed"><option>0.5</option><option selected>1</option><option>2</option><option>4</option><option>8</option></select></label></div><h2>床位资料</h2><label>姓名 <input id="name"></label><label>科室 <input id="department"></label><label>备注 <input id="notes"></label><button id="save">保存资料</button><h2>导出</h2><a href="/api/csv/arrivals" download="arrivals.csv">到站</a><a href="/api/csv/vitals" download="vitals.csv">体征</a><a href="/api/csv/summary" download="summary.csv">任务汇总</a><a href="/api/csv/events" download="events.csv">事件</a><h2>事件时间线</h2><pre id="events"></pre></section></main>
+<script src="/vitals.js"></script>
+<script>
+const $=id=>document.getElementById(id), ctx=$('map').getContext('2d');
+let layout,state;
+async function command(data){const response=await fetch('/api/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!response.ok)alert(await response.text());}
+$('create').onclick=()=>command({action:'create_task',bed:$('bed').value});
+$('sample').onclick=()=>command({action:'trigger_sample',bed:$('bed').value});
+$('pause').onclick=()=>command({action:'pause'});$('resume').onclick=()=>command({action:'resume'});
+$('speed').onchange=()=>command({action:'set_speed',speed:Number($('speed').value)});
+$('save').onclick=()=>command({action:'update_bed',bed:$('bed').value,fields:{name:$('name').value,department:$('department').value,notes:$('notes').value}});
+$('bed').onchange=()=>{const info=state?.beds[$('bed').value]||{};for(const field of ['name','department','notes'])$(field).value=info[field]||'';};
+function point(x,y){return [500+x*48,380-y*48];}
+function draw(){
+  ctx.clearRect(0,0,1000,760);
+  const latest = latestVitals(state.map_id ? null : state.samples);
+  for(const b of layout.boxes){
+    const [x,y]=point(b.x-b.sx/2,b.y+b.sy/2);
+    const result=latest.get(b.name);
+    ctx.fillStyle=result?.color || `rgb(${b.color.slice(0,3).map(v=>Math.round(v*255)).join(',')})`;
+    ctx.fillRect(x,y,b.sx*48,b.sy*48);
+  }
+  for(const [name,pos] of layout.stops){
+    const [x,y]=point(...pos),result=latest.get(name);
+    ctx.fillStyle=result?.color || '#263d50';ctx.font='14px sans-serif';
+    ctx.fillText(result ? `${name} ${result.label}` : name,x+5,y-5);
+  }
+  for(const r of state.robots){const [x,y]=point(...r.xy);ctx.strokeStyle=ctx.fillStyle=`rgb(${r.color.slice(0,3).map(v=>Math.round(v*255)).join(',')})`;ctx.beginPath();ctx.moveTo(x,y);for(const pos of r.path)ctx.lineTo(...point(...pos));ctx.stroke();ctx.beginPath();ctx.arc(x,y,14,0,Math.PI*2);ctx.fill();ctx.fillText(r.id+' '+r.status,x+18,y);}
+}
+fetch('/api/layout').then(r=>r.json()).then(data=>{layout=data;for(const [bed] of layout.stops){const option=document.createElement('option');option.value=option.textContent=bed;$('bed').append(option);}const stream=new EventSource('/api/stream');stream.onmessage=event=>{state=JSON.parse(event.data);if(!state.robots)return;$('status').textContent=state.started
+  ? (state.paused?'巡查已暂停':'巡查进行中')+' · 已运行 '+Math.floor(state.elapsed)+' 秒 · MQTT '+(state.mqtt?'已连接':'未连接')
+  : '巡查未开始。创建任务后开始计时。';$('tasks').replaceChildren();for(const task of state.tasks){const row=document.createElement('tr');for(const value of [task.task_id,task.bed_id,task.robot_id||'待分配',task.status]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}$('tasks').append(row);}$('events').textContent=state.events.slice(-80).map(e=>`${e.event_id} | 步 ${e.step} | ${e.event} | ${e.task_id||''} ${e.sample_id||''} ${e.reason} ${e.payload?.vitals?JSON.stringify(e.payload.vitals):''}`).join('\n');draw();};stream.onerror=()=>{$('status').textContent='连接中断，正在重连';};});
+</script></html>

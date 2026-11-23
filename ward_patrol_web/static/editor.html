@@ -1,0 +1,344 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>病区巡查工作台</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef2f5;color:#233747;font:14px 'Segoe UI',sans-serif}header{background:#153b4b;color:white;padding:14px 22px;display:flex;gap:20px;align-items:center}header a{color:white}h1{font-size:21px;margin:0}button,input,select,textarea{font:inherit;padding:6px;border:1px solid #bccbd1;border-radius:5px}button{cursor:pointer;background:white}button:hover{background:#e2f1ef}button.primary{background:#167364;color:white}label{display:inline-flex;gap:5px;align-items:center;margin:4px 5px 4px 0}input[type=number]{width:76px}input.short{width:110px}textarea{width:100%;min-height:80px}main{display:grid;grid-template-columns:minmax(550px,1fr) 380px;gap:12px;padding:12px}section,.panel{background:white;border-radius:8px;padding:12px;margin-bottom:12px}h2{font-size:16px;margin:5px 0 10px}canvas{width:100%;background:#fbfcfc;touch-action:none;border:1px solid #cedae0}#notice{white-space:pre-wrap;padding:12px;background:#e3f0ed;max-height:180px;overflow:auto}#notice:empty{display:none}#inspector label{display:flex;justify-content:space-between}#inspector input{width:210px}#events,#previewResult{white-space:pre-wrap;max-height:220px;overflow:auto}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:5px;border-bottom:1px solid #eee}.bar{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}details{margin:12px 0}summary{cursor:pointer;font-weight:600}.muted{color:#667d89;font-size:12px}.status{padding:8px;background:#edf4f7}#mapList{max-width:min(290px,100%)}#replaySlider{width:100%}@media(max-width:1000px){main{grid-template-columns:1fr}aside{display:grid;grid-template-columns:1fr 1fr;gap:10px}}
+
+.build-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}.build-tools .active{outline:3px solid #80cbbb}#floorArea{margin-left:auto;color:#51716b;font-weight:600}#catalog{display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;gap:8px;padding:12px;background:#e9f0ef;border-radius:10px}.item-card{flex:0 0 92px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;background:white;border:1px solid #d1dedb;box-shadow:0 2px 3px #193c3310;cursor:grab;touch-action:none;user-select:none}.item-card:active{cursor:grabbing}.item-card canvas{width:64px;height:56px;border:0;background:transparent;pointer-events:none}.item-card small{font-size:10px;color:#657b75}.item-card.active{border:2px solid #167364;background:#e2f4ee}.drag-card{position:fixed;pointer-events:none;z-index:9999;opacity:.8;transform:translate(-50%,-50%);background:#fff;border:2px solid #167364;border-radius:8px;padding:8px;box-shadow:0 5px 20px #163d3433}#canvas{border-radius:8px;cursor:default}#tool{max-width:145px}
+.camera-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 8px}.camera-controls[hidden]{display:none}.camera-controls output{min-width:4ch;text-align:center}.camera-controls button[aria-pressed=true]{background:#167364;color:white}
+ 
+.viewport{position:relative;min-width:0;border:1px solid #cedae0;border-radius:8px;overflow:hidden}
+#canvas{display:block;width:100%;height:clamp(330px,59vh,600px);border:0;border-radius:0}
+.viewport .camera-controls{position:absolute;top:8px;left:8px;z-index:1;margin:0;padding:3px;background:#fffffff0;border-radius:6px;gap:4px;max-width:calc(100% - 116px)}
+.viewport .camera-controls button,.orbit-handle{padding:4px 7px;font-size:12px}
+.orbit-handle{position:absolute;top:8px;right:8px;z-index:1;background:#fffffff0;touch-action:none;user-select:none;cursor:grab}
+.orbit-handle:active{cursor:grabbing}
+.orbit-handle span{font-size:16px}
+.viewport-help{margin:6px 0}
+#catalog{position:static;padding:6px;gap:5px}
+.item-card{flex-basis:76px;padding:4px 2px;gap:2px;font-size:12px}
+.item-card canvas{width:45px;height:37px}
+
+.model-tooltip{position:fixed;z-index:10000;pointer-events:none;max-width:min(290px,calc(100vw - 16px));padding:10px 12px;background:#173542;color:#fff;border-radius:8px;box-shadow:0 4px 16px #14313c40;line-height:1.5}
+.model-tooltip strong,.model-tooltip span{display:block}
+.model-tooltip .model-size{color:#c3e0e2;font-size:12px;margin-bottom:4px}
+.model-tooltip .model-controls{font-size:12px;color:#d3e7e8;margin-top:5px}
+
+.floor-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0;background:#edf4f3;padding:5px;border-radius:7px}
+.floor-tabs{position:relative;display:flex;gap:4px;overflow-x:auto;min-width:0;flex:1 1 180px}
+.floor-tabs button,.floor-actions button{white-space:nowrap;font-size:12px;padding:4px 8px}
+.floor-tabs button[aria-pressed=true]{background:#167364;color:#fff;border-color:#167364;font-weight:600}
+.floor-actions{display:flex;gap:4px;flex-wrap:wrap}#deleteFloor:not(:disabled){color:#a03c38}#buildingView[aria-pressed=true]{background:#167364;color:#fff}
+#floorNameForm{flex-basis:100%;font-size:12px}
+#floorNameForm input{max-width:180px}
+.canvas-floor{position:absolute;bottom:8px;left:8px;pointer-events:none;background:#fffffff0;border-radius:5px;padding:4px 7px;font-size:12px;font-weight:600;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wall-status{margin:6px 0;padding:5px 8px;background:#e8f3ef;color:#234b40;border-radius:5px;font-size:12px}.wall-status[data-warning=true]{background:#fff0d9;color:#71471b}
+.wall-door-tools{position:absolute;z-index:3;max-width:min(250px,calc(100% - 16px));padding:9px 10px;border:1px solid #c0d4cc;border-radius:8px;background:#f8fffc;box-shadow:0 3px 12px #17354240}
+.wall-door-tools strong{display:block}
+.wall-door-tools button{margin-left:3px;min-width:32px}
+#wallDoorTools label[hidden]{display:none}#wallRoomNumber{max-width:112px}#wallDoorError{font-size:12px;color:#9d3732;max-height:7em;overflow:auto}
+#liftManager{margin:0}#liftManagerBody{margin-top:10px}#liftManagerBody label{display:flex;justify-content:space-between}#liftManagerBody input[type=checkbox]{margin-left:auto}#liftManagerBody fieldset{border:1px solid #d2dee0;border-radius:6px;margin:8px 0}#liftManagerBody table button{font-size:12px;padding:4px;margin:2px}#liftManagerBody small,.lift-warning{color:#92541c}#liftManagerBody td{vertical-align:top}
+
+#inspector .inspector-info{display:flex;justify-content:space-between;gap:12px;padding:5px 0}
+#inspector form label>input:not([type=checkbox]),#inspector form select{max-width:65%}
+#inspector form input[type=checkbox]{width:auto}
+#inspector fieldset{margin:8px 0;border:1px solid #d2dee0;border-radius:6px}
+#inspector details{margin:8px 0}
+#mapNameForm[hidden]{display:none}#mapNameForm input{width:min(250px,70%)}
+#inspector .patient-fields[hidden]{display:none}#inspector .patient-fields legend{font-weight:600;color:#244b52}
+
+#fleetBattery:empty,#floorCoverage:empty{display:none}
+#modelForm fieldset,#modelForm details{margin:8px 0}
+#modelForm fieldset{border:1px solid #d2dee0;border-radius:6px}
+#modelForm input[type=number],#instanceForm input[type=number]{width:95px}
+
+#fleetQueue,#modelQueue{margin:6px 0}
+#fleetQueueList button,#modelQueue button{display:block;text-align:left;width:100%;margin-bottom:4px}
+#modelQueue button[aria-expanded=true]{border-color:#167364;background:#e8f3ef}
+#saveConfig{margin-top:4px}
+#deleteInstance:not(:disabled),#deleteModel:not(:disabled){color:#a03c38}
+#taskEditor,#modelEditor{border-top:1px solid #d2dee0;padding-top:8px;margin:8px 0}
+#modelFeedback:empty{display:none}
+#taskPickModes [aria-pressed=true]{background:#167364;color:white}
+#taskFloorPicker{width:min(420px,calc(100vw - 30px));max-height:85dvh;overflow:auto;padding:20px;border:1px solid #c3d8ce;border-radius:14px;color:inherit}
+#taskFloorChoices label{display:flex;gap:8px;margin:8px 0}
+#taskFeedback{white-space:pre-line}
+#taskFeedback.task-feedback-warning{background:#fff8dd;border:1px solid #e8ce78;border-radius:6px;padding:8px 10px;color:#654816;overflow-wrap:anywhere}
+#taskFeedback:empty{display:none}
+#sceneExtra[hidden]{display:none}
+.task-list{padding:0;list-style:none}
+.task-list li{overflow-wrap:anywhere;margin:4px 0}
+#taskBeds li{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#taskBeds .duplicate-task-bed,.task-queue .duplicate-task-bed{background:#fff1df;color:#7a3d13;outline:1px solid #d79044;border-radius:5px}
+.task-queue details{border:1px solid #d2dee0;border-radius:5px;padding:8px;margin:5px 0}
+.task-queue li+li{border-top:1px solid #d2dee0;padding-top:6px}
+.task-queue li p{margin:4px 0}
+.task-queue .bar{margin:4px 0 0}
+.task-queue .delete-task{color:#a03c38}
+.task-queue summary,#taskNotes{overflow-wrap:anywhere}
+.task-detail-fields{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 10px;margin:10px 0}
+.task-detail-fields dt{color:#526873}
+.task-detail-fields dd{margin:0;overflow-wrap:anywhere}
+#addTaskBed label{flex-wrap:wrap}
+#taskBedNumber{max-width:100%}
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/console.css">
+<link rel="stylesheet" href="/workbench.css">
+<body class="workbench">
+<a class="skip-link" href="#workspaceMain">跳到工作区</a>
+<header><h1>病区巡查工作台</h1><div class="header-actions"><button id="openGuide" type="button">使用引导</button><a href="/monitor">简易监控 ↗</a></div></header>
+<div class="app-shell">
+<nav class="workspace-nav" aria-label="工作台导航">
+<p class="nav-caption">工作流程</p>
+<button type="button" data-view="map" aria-controls="workspaceMain" aria-current="page"><span class="nav-number">01</span><span>地图建模<small>楼层 · 物件 · 电梯</small></span></button>
+<button type="button" data-view="fleet" aria-controls="workspaceMain"><span class="nav-number">02</span><span>车队配置<small>车型 · 车辆 · 停车点</small></span></button>
+<button type="button" data-view="tasks" aria-controls="workspaceMain"><span class="nav-number">03</span><span>任务调度<small>选床 · 发布 · 排队</small></span></button>
+<button type="button" data-view="monitor" aria-controls="workspaceMain"><span class="nav-number">04</span><span>运行监控<small>路线 · 驻留 · 状态</small></span></button>
+<div class="nav-divider"></div>
+<button type="button" data-view="archive" aria-controls="workspaceMain"><span class="nav-number" aria-hidden="true">▤</span><span>归档管理<small>地图版本 · 巡查任务</small></span></button>
+<button type="button" data-view="replay" aria-controls="workspaceMain"><span class="nav-number">↶</span><span>历史回放<small>运行记录 · 事件导出</small></span></button>
+<div class="nav-footer"><span class="connection-dot" id="workspaceConnectionDot"></span><span id="workspaceConnection">正在连接服务</span><p>按阶段处理，随时切换。<br>切换分区会保留当前草稿。</p></div>
+</nav>
+<div class="workspace-content">
+<div id="welcomeBanner" class="welcome-banner" hidden><div><strong>从建图到巡查，按左侧顺序完成即可</strong><span>已有地图和车队时，可以直接进入任务调度。</span></div><button type="button" id="welcomeGuide">查看操作引导</button><button type="button" id="dismissWelcome" aria-label="关闭欢迎提示">×</button></div>
+<div class="workspace-heading"><div><p class="eyebrow" id="workspaceEyebrow">步骤 01 / 04</p><h2 id="workspaceTitle" tabindex="-1">地图建模</h2><p id="workspaceDescription">编辑病区布局，设置楼层及电梯通行关系。</p></div><button type="button" id="workspaceNext" class="primary">下一步：配置车队 →</button></div>
+<div class="workflow-progress" id="workflowProgress" aria-label="巡查准备状态"></div>
+<div id="notice" role="status">正在加载地图和车队…</div>
+<main id="workspaceMain"><div id="canvasColumn" data-workspace="map fleet tasks monitor replay">
+<section id="mapCanvasPanel"><div class="bar" id="mapDocumentBar">
+  <div class="map-document-group" id="templateMapControls"><label for="mapTemplateList">地图模板</label><select id="mapTemplateList" disabled></select><button id="useMapTemplate" type="button" disabled>从此模板建图</button></div>
+  <div class="map-document-group"><label for="mapList">已保存地图</label><select id="mapList" disabled></select><button id="openMapManager" type="button" aria-haspopup="dialog" aria-controls="mapBatchManager" disabled>批量管理地图</button><button id="saveMap" class="primary">保存新版本</button></div>
+  <button type="button" id="renameMap" disabled aria-controls="mapNameForm" aria-expanded="false">改名</button><button id="blank">空白地图</button><button id="exportMap">导出地图</button><label>导入 <input id="importMap" type="file" accept="application/json" style="width:170px"></label>
+</div>
+<dialog id="mapBatchManager" class="map-manager" aria-labelledby="mapBatchTitle">
+  <div class="map-batch-heading">
+    <h2 id="mapBatchTitle">批量管理已保存地图</h2>
+    <button id="closeMapManager" type="button" autofocus>返回地图建模</button>
+  </div>
+  <div class="map-manager-actions">
+    <label>搜索 <input data-map-search type="search" placeholder="地图名称、编号或版本"></label>
+    <div class="bar">
+      <button data-map-operation="archive" type="button" class="primary" disabled>批量归档</button>
+      <button data-map-operation="delete" type="button" disabled>批量永久删除</button>
+    </div>
+  </div>
+  <div class="bar map-manager-selection">
+    <label><input data-map-select-all type="checkbox" disabled>全选筛选结果</label>
+    <span data-map-count aria-live="polite"></span>
+  </div>
+  <div class="archive-list map-manager-list">
+    <table><thead><tr><th scope="col">选择</th><th scope="col">地图</th><th scope="col">版本</th></tr></thead><tbody></tbody></table>
+    <p class="muted" data-map-empty hidden></p>
+  </div>
+  <p data-map-feedback role="status"></p>
+</dialog>
+<form id="mapNameForm" class="bar" hidden>
+<label for="mapName">名称</label><input id="mapName" maxlength="60" required>
+<button id="confirmMapName" type="submit">保存名称</button><button id="cancelMapName" type="button">取消</button>
+</form>
+<div class="bar"><select id="floor" hidden></select><label>宽 m <input id="floorWidth" type="number" min="1" max="100"></label><label>高 m <input id="floorHeight" type="number" min="1" max="100"></label><button id="resizeFloor">修改尺寸</button></div>
+<div class="bar"><select id="tool" aria-label="更多建图类型"><option value="select">选择 / 拖动</option><option value="wall">墙</option><option value="door">门</option><option value="bed">床</option><option value="furniture">家具</option><option value="parking">停车点</option><option value="service">服务点</option><option value="elevator">电梯入口</option><option value="waiting">候梯点</option><option value="exit">出梯区域</option><option value="forbidden">禁行区</option><option value="one_way">单向区域</option></select><label>吸附 m <input id="snap" type="number" value="0.1" min="0.01" step="0.05"></label><button id="rotate">旋转 15°</button><button id="deleteObject" title="删除选中物品（Delete）" aria-keyshortcuts="Delete">删除</button><button id="undo" title="撤销上一步（Ctrl+Z）" aria-keyshortcuts="Control+Z">撤销</button></div>
+<div class="build-tools"><button id="drawFloor" class="primary">▱ 拖框创建楼层范围</button><button type="button" id="drawRoom">▱ 框建病房</button><button id="drawWall">╱ 拖线画隔墙</button><button id="selectObject">↖ 移动与调整</button><button type="button" id="boxSelect">框选物件</button><button type="button" id="copyObjects" disabled>复制所选</button><span id="floorArea"></span></div>
+<div id="catalog" aria-label="病区物品栏"></div>
+<p class="muted">将物品卡片拖到画布。门拖到墙上会自动开口；病床自带床旁服务点。选中物品可拖动，拖右下角调整大小，拖上方圆点旋转。</p>
+<div class="floor-toolbar">
+<div id="floorTabs" class="floor-tabs" role="group" aria-label="选择楼层"></div>
+<div class="floor-actions"><button id="buildingView" type="button" aria-pressed="false" aria-controls="canvas">查看整栋楼</button><button id="addFloor" type="button">新增楼层</button><button id="copyFloor" type="button">复制楼层</button><button id="renameFloor" type="button" aria-expanded="false" aria-controls="floorNameForm">改名</button><button id="deleteFloor" type="button" disabled>删除楼层</button></div>
+<form id="floorNameForm" hidden>
+<label for="floorName">楼层名称</label>
+<input id="floorName" maxlength="40" required>
+<button type="submit">确定</button><button id="cancelFloorRename" type="button">取消</button>
+</form>
+</div>
+<div class="viewport">
+<div id="cameraControls" class="camera-controls" role="group" aria-label="画布操作">
+<button type="button" id="cameraOut" aria-label="缩小">−</button>
+<output id="cameraZoom">100%</output>
+<button type="button" id="cameraIn" aria-label="放大">＋</button>
+<button type="button" id="cameraLeft" aria-label="向左旋转">↶</button>
+<button type="button" id="cameraRight" aria-label="向右旋转">↷</button>
+<button type="button" id="cameraTop">正俯视</button>
+<button type="button" id="panCamera" aria-pressed="false">移动画布</button>
+<button type="button" id="buildingSpin" hidden>暂停旋转</button>
+<button type="button" id="cameraFit">重置视角</button>
+</div>
+<button type="button" id="orbitCamera" class="orbit-handle" title="按住左键拖动，调整视角" aria-label="拖动环绕视角">
+<span aria-hidden="true">⟳</span> 拖动旋转
+</button>
+<canvas id="canvas" width="900" height="520"></canvas>
+<div class="canvas-floor" id="canvasFloor" role="status"></div>
+<div id="wallDoorTools" class="wall-door-tools" role="dialog" aria-labelledby="wallDoorLocation" hidden>
+<strong id="wallDoorLocation">是否开辟门洞？</strong>
+<label id="wallFixtureKindField">创建类型 <select id="wallFixtureKind"><option value="door">门洞</option><option value="elevator">电梯入口</option></select></label>
+<label id="wallFixtureWidthField"><span id="wallFixtureWidthLabel">门宽（米）</span> <input id="wallDoorWidth" type="number" min="0.4" max="5" step="0.05" value="1.8"></label>
+<label id="wallRoomNumberField">病房编号 <input id="wallRoomNumber" maxlength="24" placeholder="可留空"></label>
+<label id="wallLiftField" hidden>所属电梯 <select id="wallLift"></select></label>
+<div id="wallLiftDetails" hidden></div>
+<button type="button" id="addWallDoor" class="primary">是</button>
+<button type="button" id="cancelWallDoor">否</button>
+<div id="wallDoorError" role="status"></div>
+</div>
+</div>
+<p id="wallStatus" class="wall-status" role="status"></p><p id="viewportHelp" class="muted viewport-help">左键编辑物件。点「移动画布」后可拖动平移。</p>
+<div><label>底图 <input id="background" type="file" accept="image/*" style="width:190px"></label><label>标定距离 m <input id="calibrationDistance" type="number" value="5" min="0.01"></label><button id="calibrate">依次点底图上两点标定</button><button id="clearBackground">清除底图</button></div>
+</section>
+<section id="runtimePanel"><h2>巡查状态</h2><div class="bar" id="runtimeActions"><button id="preview">车型通行预览</button><button id="start" class="primary">准备巡查</button><button id="pause">暂停</button><button id="resume">继续</button><button id="endRun" type="button" disabled>结束</button><label>倍速 <select id="speed"><option>1</option><option>2</option><option>4</option><option>8</option></select></label></div><div id="runtime" class="status"></div><p id="fleetBattery" class="muted"></p><p id="floorCoverage" class="muted"></p><pre id="previewResult"></pre><details id="eventDetails"><summary>事件记录与导出</summary><pre id="events"></pre><a href="/api/csv/events" download="events.csv">下载当前运行事件 CSV</a></details></section>
+<section id="replayPanel"><h2>选择历史运行</h2><p class="muted">加载后可切换楼层、拖动时间轴查看当时的车辆和任务。离开回放分区会返回实时地图。</p><label for="runs">运行记录</label><select id="runs"></select><label class="muted"><input id="replayIncludeEmpty" type="checkbox"> 包含未开始的记录</label><p id="replayRecordsStatus" class="muted" role="status"></p><button id="refreshRuns">刷新记录</button><button id="loadReplay">加载回放</button><button id="exitReplay">返回实时</button><label class="replay-time-label" for="replaySlider">回放时间轴</label><input id="replaySlider" type="range" min="0" max="0" value="0"><div id="replayInfo" role="status"></div></section>
+<div id="dispatchPolicyPanel">
+<p id="dispatchPolicyUnavailable" class="muted">请先在「车队配置」中点击「准备当前地图」。准备完成后即可调整调度偏好。</p>
+<div id="dispatchPolicyForm" hidden>
+<p class="muted">时间均为仿真秒，仅应用于当前运行。等梯预算用于保守规划，不代表实际等待时间上限。</p>
+<div class="bar">
+<label>普通响应目标 <input data-policy-key="response_seconds" type="number" min="1" step="any"></label>
+<label>高优先级响应目标 <input data-policy-key="urgent_response_seconds" type="number" min="1" step="any"></label>
+<label>可接单时间窗 <input data-policy-key="coverage_ready_seconds" type="number" min="1" step="any"></label>
+<label>缺车持续阈值 <input data-policy-key="vacancy_grace_seconds" type="number" min="0" step="any"></label>
+<label>补位观察时间 <input data-policy-key="rebalance_delay_seconds" type="number" min="0" step="any"></label>
+<label>跨层调动稳定期 <input data-policy-key="relocation_cooldown_seconds" type="number" min="0" step="any"></label>
+<label>等梯区间下沿 <input data-policy-key="elevator_wait_lower_seconds" type="number" min="0" step="any"></label>
+<label>冷启动等梯预算 <input data-policy-key="elevator_wait_upper_seconds" type="number" min="0" step="any"></label>
+<label>床位分组路程 m <input data-policy-key="spatial_radius_m" type="number" min="0" step="any"></label>
+</div><button id="applyDispatchPolicy" type="button">应用到当前运行</button><p id="dispatchPolicyFeedback" class="muted" role="status"></p>
+</div>
+</div>
+<section id="elevatorMonitor" hidden><h2>电梯运行</h2>
+<pre id="elevatorStatus"></pre>
+<div class="bar" id="elevatorControls">
+<label>电梯 <select id="runningElevator"></select></label>
+<button id="enableElevator" type="button">恢复运行</button><button id="disableElevator" type="button">停用</button><button id="faultElevator" type="button">注入故障</button>
+<label>出口楼层 <select id="runningElevatorExit"></select></label>
+<button id="blockElevatorExit" type="button">堵塞出口</button><button id="freeElevatorExit" type="button">清除堵塞</button>
+<label>共享占用秒数 <input id="elevatorTrafficSeconds" type="number" min="0" value="60" step="any"></label>
+<button id="simulateElevatorTraffic" type="button">模拟共享占用</button><button id="clearElevatorTraffic" type="button">结束共享占用</button>
+</div>
+<a id="elevatorTimeline" download="elevators.jsonl">下载逐步电梯记录</a>
+</section>
+<section id="passageMonitor" hidden><h2>窄通道运行</h2><pre id="passageStatus"></pre>
+<div class="bar" id="passageControls"><label>通道 <select id="runningPassage"></select></label>
+<button id="blockPassageExit" type="button">堵塞出口</button><button id="freePassageExit" type="button">清除堵塞</button></div>
+</section>
+<section id="perceptionMonitor" hidden>
+<h2>测距与障碍</h2>
+<div class="bar"><label>视图 <select id="perceptionView"><option value="global">全景</option><option value="robot">本车视角</option></select></label>
+<label>车辆 <select id="perceptionRobot"></select></label></div>
+<p id="perceptionStatus" class="status"></p>
+<div id="obstacleControls">
+<div class="bar"><label>编号 <input id="sceneObstacleId" class="short" value="cart-1" maxlength="32"></label>
+<label>类型 <select id="sceneObstacleKind"><option value="cart">推车</option><option value="person">行人</option><option value="closure">管理封路</option></select></label>
+<button id="pickObstaclePosition" aria-pressed="false" type="button">从画布取位置</button></div>
+<div class="bar"><label>X（米） <input id="sceneObstacleX" type="number" step="any"></label><label>Y（米） <input id="sceneObstacleY" type="number" step="any"></label></div>
+<div class="bar" id="sceneExtra" hidden><label id="sceneExtraXLabel" for="sceneExtraX"></label><input id="sceneExtraX" type="number" step="any">
+<label id="sceneExtraYLabel" for="sceneExtraY"></label><input id="sceneExtraY" type="number" step="any"></div>
+<button id="saveSceneObstacle" type="button">添加或移动</button> <button id="removeSceneObstacle" type="button">移除</button>
+<p id="sceneObstacleResult" role="status"></p>
+</div>
+</section>
+</div><aside id="workspaceAside" aria-label="当前分区工具" data-workspace="map fleet tasks monitor replay">
+<section id="mapToolsPanel"><h2>建图工具</h2><p class="muted">先设置楼层范围，再添加病房、床位与停车点。</p><div id="structureTools"></div><details id="catalogDetails" open><summary>病区物件</summary><div id="catalogSlot"></div></details><details id="mapAdvanced"><summary>尺寸与精细调整</summary><div id="mapAdvancedSlot"></div></details></section>
+<section id="liftPanel"><details id="liftManager"><summary>电梯统一管理</summary><div id="liftManagerBody"></div></details></section>
+<section id="inspectorPanel"><h2>对象属性</h2><div id="inspector">选择画布对象</div></section>
+<section id="modelsPanel"><h2>车型参数</h2><p class="muted">定义车身尺寸、通行能力和测距设置。</p>
+<div class="bar"><button id="newModel" type="button" aria-expanded="false" aria-controls="modelEditor">新增车型</button><button id="modelQueueButton" type="button" aria-expanded="false" aria-controls="modelQueue">车型队列（0 种）</button></div>
+<div id="modelQueue" hidden></div>
+<select id="model" hidden aria-label="当前车型"></select>
+<div id="modelEditor" hidden><div id="modelForm"></div><button id="saveModel" type="button">保存车型</button> <button id="cancelModel" type="button" hidden>取消新增</button> <button id="deleteModel" type="button" hidden>删除车型</button></div>
+<p id="modelFeedback" role="status"></p>
+</section>
+<section id="fleetPanel"><h2>车辆与停车点</h2><p class="muted">为每台车选择车型、所属楼层和独立停车点。</p>
+<div class="bar"><button id="newInstance" type="button" aria-haspopup="dialog" aria-controls="instanceEditor">新增车辆实例</button><button id="fleetQueueButton" type="button" aria-expanded="false" aria-controls="fleetQueue">车辆队列（0 台）</button></div>
+<div id="fleetQueue" hidden>
+<div id="fleetQueueList"></div>
+</div>
+<button id="saveConfig" type="button" class="primary">保存车队配置</button>
+<select id="instance" hidden aria-label="当前车辆"></select>
+<dialog id="instanceEditor" aria-labelledby="instanceEditorTitle">
+<h2 id="instanceEditorTitle"></h2>
+<div id="instanceForm"></div>
+<p id="instanceFeedback" role="alert"></p>
+<div class="bar instance-actions">
+<button id="saveInstance" type="button" class="primary">保存车辆实例</button>
+<button id="cancelInstance" type="button">取消</button>
+<button id="deleteInstance" type="button">删除车辆实例</button>
+</div>
+</dialog>
+</section>
+<section id="tasksPanel">
+<h2>巡查任务</h2><p class="muted">先选床位并保存，再到任务队列勾选发布。下发后自动分配车辆和路线。</p>
+<div class="bar">
+<button id="newTask" type="button" aria-expanded="false" aria-controls="taskEditor">创建任务</button>
+<button id="savedTaskQueueButton" type="button" aria-expanded="false" aria-controls="savedTaskQueue">任务队列（0 项）</button>
+</div>
+<p id="taskFeedback" role="status"></p>
+<div id="savedTaskQueue" class="task-queue" hidden>
+<div id="savedTaskRows"></div>
+<button id="publishSelectedTasks" type="button" hidden disabled>发布所选任务</button>
+</div>
+<div id="taskEditor" hidden>
+<p class="muted">保存时自动生成任务编号并记录创建时间。</p>
+<div class="bar" id="taskPickModes" role="group" aria-label="巡检范围">
+  <button id="pickTaskBeds" type="button" aria-pressed="false">选床位</button>
+  <button id="pickTaskRooms" type="button" aria-pressed="false">选病房</button>
+  <button id="pickTaskFloors" type="button" aria-haspopup="dialog" aria-controls="taskFloorPicker">选楼层</button>
+</div>
+<p id="taskPickHint" class="muted">可跨楼层选择。取消选择请在清单中点「移除」。</p>
+<dialog id="taskFloorPicker" aria-labelledby="taskFloorTitle">
+  <h2 id="taskFloorTitle">选择巡检楼层</h2>
+  <form id="taskFloorForm">
+    <div id="taskFloorChoices"></div>
+    <div class="bar"><button id="addTaskFloors" class="primary" type="submit" disabled>添加所选楼层</button><button id="cancelTaskFloors" type="button">取消</button></div>
+  </form>
+</dialog>
+<form id="addTaskBed" class="bar">
+<label>手动添加 <select id="taskInputType"><option value="bed">床位</option><option value="room">病房</option><option value="floor">楼层</option></select></label>
+<label><input id="taskBedNumber" aria-label="手动输入床位编号" list="taskBedOptions" placeholder="如 二层 / N2-1" autocomplete="off"></label>
+<button type="submit">添加</button>
+<datalist id="taskBedOptions"></datalist>
+</form>
+<ul id="taskBeds" class="task-list" aria-label="已选床位"></ul>
+<label>优先级 <select id="priority"><option value="1">高</option><option value="0" selected>中</option><option value="-1">低</option></select></label><label>截止时间（仿真秒） <input id="deadline" type="number" min="0" step="any" placeholder="可选"></label>
+<label for="taskNotes">备注（选填）</label><textarea id="taskNotes" rows="2"></textarea>
+<details><summary>任务设置与模板</summary>
+<label>内容 <input id="content" value="床旁巡查"></label><label>服务方式 <select id="serviceType"><option value="dwell">停留计时</option><option value="manual">人工确认</option><option value="mqtt">MQTT 采样</option></select></label><label>服务时长 s <input id="duration" type="number" value="1" min="0"></label><label>发布时间 s <input id="release" type="number" value="0" min="0"></label><label>能力要求 <input id="capabilities" placeholder="patrol,vitals"></label><label>指定车辆 <select id="assignedRobot"><option value="">自动分配</option></select></label><label>数量 <input id="count" type="number" min="1" max="1000" value="1"></label><label>发布间隔 s <input id="period" type="number" min="0" value="0"></label>
+<details><summary>任务模板</summary><label>模板 <select id="template"></select></label><button id="useTemplate">应用模板</button><label>名称 <input id="templateName" class="short"></label><button id="saveTemplate">保存模板</button></details>
+<p class="muted">发布间隔按仿真时间计算。每次发布均包含所选床位。</p>
+</details>
+<button id="saveTask" type="button" class="primary">保存任务</button>
+</div>
+</section>
+</aside>
+<div id="archiveWorkspace" class="workspace-hidden" data-workspace="archive">
+  <div class="archive-categories" role="group" aria-label="归档类型">
+    <button type="button" data-archive-category="maps" aria-controls="mapManager" aria-pressed="true">已归档地图</button>
+    <button type="button" data-archive-category="tasks" aria-controls="archivedTasks" aria-pressed="false">巡查任务</button>
+  </div>
+<section id="mapManager" class="map-manager" aria-labelledby="mapManagerTitle">
+  <h2 id="mapManagerTitle">已归档地图</h2>
+  <div class="bar">
+    <label>搜索 <input data-map-search type="search" placeholder="地图名称、编号或版本"></label>
+  </div>
+  <div class="map-manager-actions">
+    <div class="bar">
+      <label><input data-map-select-all type="checkbox" disabled>全选筛选结果</label>
+      <span data-map-count aria-live="polite"></span>
+    </div>
+    <div class="bar">
+      <button data-map-operation="restore" type="button" class="primary" disabled>批量恢复</button>
+      <button data-map-operation="delete" type="button" disabled>批量永久删除</button>
+    </div>
+  </div>
+  <div class="archive-list map-manager-list">
+    <table><thead><tr><th scope="col">选择</th><th scope="col">地图</th><th scope="col">版本</th></tr></thead><tbody></tbody></table>
+    <p class="muted" data-map-empty hidden></p>
+  </div>
+  <p data-map-feedback role="status"></p>
+</section>
+<section id="archivedTasks" aria-labelledby="archivedTasksTitle" hidden>
+  <h2 id="archivedTasksTitle">已归档巡查任务</h2>
+  <label>搜索 <input id="archivedTaskSearch" type="search" placeholder="任务编号、地图编号或床位"></label>
+  <div class="archive-list">
+    <table><thead><tr><th scope="col">任务编号</th><th scope="col">床位</th><th scope="col">归档时间</th><th scope="col">运行记录</th></tr></thead><tbody id="archivedTaskRows"></tbody></table>
+  </div>
+  <p id="archivedTaskStatus" class="muted" role="status"></p>
+</section>
+</div></main></div></div>
+<dialog id="workbenchGuide" aria-labelledby="guideTitle"><div class="guide-header"><div><p class="eyebrow">开始使用</p><h2 id="guideTitle">完成一次病区巡查</h2></div><button type="button" id="closeGuide" aria-label="关闭操作引导">×</button></div><p class="guide-intro">配置与执行分开进行。已有配置时，可从任一步继续；这里只引导操作，不会自动下发任务。</p><ol id="guideSteps"></ol><div class="guide-tip">地图修改后要保存新版本，再准备巡查。任务保存和发布是两个步骤。</div><button type="button" id="guideContinue" class="primary">前往当前建议步骤</button></dialog>
+<script src="/vitals.js"></script><script src="/elevators.js"></script><script src="/editor.js"></script><script src="/furnishing.js"></script><script src="/workbench.js"></script></body></html>

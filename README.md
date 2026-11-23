@@ -64,6 +64,21 @@ ward_patrol_robot/
 
 ## 运行演示
 
+查看地图编辑、车辆配置和巡检任务，可从项目根目录启动 Web 演示：
+
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements/requirements_web.txt
+.\venv\Scripts\python.exe -m ward_patrol_web.server --no-mqtt
+```
+
+打开[巡查工作台](http://127.0.0.1:8000/)配置场景并查看床位状态，或打开[简易监控](http://127.0.0.1:8000/monitor)查看内置病区。车辆到达床旁时生成模拟体征，床位按判定显示正常（绿）、预警（橙）或危急（深红）。`--no-mqtt` 使用本地模拟采样。要通过 MQTT 收发采样请求和结果，请按 [MQTT 服务说明](ward_patrol_vitals_mqtt/README.md)启动服务，并在启动 Web 时去掉 `--no-mqtt`。
+
+任务下发后，运行器先派车，再预排后续床位及路线。同层相邻床位按真实路程分组，完整方案生成后限时尝试少量换序和换车。默认保留楼层基本接单能力，按剩余工作量支援，持续缺车时延迟补位并设置调动稳定期。等梯采用保守预算和实际排队历史分位数，运行页可模拟共享占用、修改调度偏好，并查看接单能力、服务空窗及后续虚线路线。规则、参数及复测说明见[快速床位调度](docs/fast-dispatch.md)。
+
+地图编辑器支持[电梯统一建模](docs/elevator-modeling.md)：整部电梯一次选择停靠层，各层入口用下拉框关联；支持参考位置批量复制、逐层检查确认和旧地图兼容读取。
+
+首页现在是[病区巡查工作台](docs/workbench.md)，按地图建模、车队配置、任务调度、运行监控和历史回放分区，并提供使用引导和准备状态提示。`/editor` 保留兼容，原简易监控位于 `/monitor`。
+
 所有命令均从根目录执行，不要先进入子目录。`-m` 后是带点号的模块名，不带 `.py`。
 
 ```powershell
