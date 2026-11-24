@@ -29,6 +29,8 @@ class FloorCoverage:
         self.coverage_deferred_until = {}
 
     def basic_service_capable(self, identity):
+        if self.unavailable_for_patrol(identity):
+            return False
         robot = self.by_robot[identity]
         model = self.models[self.robot_instances[identity]['model_id']]
         charge,reserve = self.available_battery(robot)
@@ -215,7 +217,7 @@ class FloorCoverage:
     def _standby_points(self, floor_id, robot):
         planner = self.planning_on(floor_id,self.models[self.robot_instances[robot.robot_id]['model_id']])
         owners = {(item['floor_id'],item['parking_id']):key for key,item in self.robot_instances.items()}
-        points = sorted((obj for obj in self.floors[floor_id]['objects'] if obj['kind'] in ('parking','service')),
+        points = sorted((obj for obj in self.floors[floor_id]['objects'] if obj['kind'] in ('parking','service') and 'charger' not in obj),
                         key=lambda obj:(obj['kind']!='parking',obj['id']))
         for obj in points:
             if obj['kind']=='parking' and owners.get((floor_id,obj['id'])) not in (None,robot.robot_id):

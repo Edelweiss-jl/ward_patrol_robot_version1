@@ -163,6 +163,8 @@ class FleetPlanning:
         states,bed_ready = {},{}
         projected = self.projected_robot_floors()
         for robot in self.robots:
+            if self.unavailable_for_patrol(robot.robot_id):
+                continue
             if robot.task_id is None and self.parking_preemption_blocked(robot):
                 continue
             floor,position,distance,seconds = self._remaining_work(robot)
@@ -314,6 +316,8 @@ class FleetPlanning:
     def _replay_plan(self, queues, tasks, budget):
         states,bed_ready,result = {},{},{}
         for robot in self.robots:
+            if self.unavailable_for_patrol(robot.robot_id):
+                continue
             floor,position,distance,seconds = self._remaining_work(robot)
             charge,reserve = self.available_battery(robot)
             states[robot.robot_id] = dict(floor=floor,position=position,available=self.elapsed+seconds,

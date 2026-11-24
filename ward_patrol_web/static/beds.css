@@ -1,0 +1,58 @@
+main { max-width: 1320px; margin: 0 auto; }
+.bed-page section { background: white; }
+.bed-filters { display: grid; grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(8rem, 1fr)) auto; align-items: end; gap: 12px; }
+.bed-page label { display: grid; gap: 4px; font-weight: 600; }
+.bed-page label :is(input:not([type="checkbox"]), select, textarea) { width: 100%; }
+.bed-page :is(button, select, input:not([type="checkbox"]), textarea) { min-height: 36px; padding: 6px 10px; }
+.bed-page [hidden] { display: none !important; }
+#bedStatus { min-height: 1.5em; margin: 12px 2px; }
+#bedStatus[data-error="true"] { color: #a5212d; }
+.bed-columns { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 3fr); gap: 16px; align-items: start; }
+.bed-columns > section { padding: clamp(14px, 2vw, 24px); }
+.bed-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.bed-floor-tabs, .bed-map-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.bed-floor-tabs button[aria-pressed="true"] { background: #dcefe9; border-color: #76ac9e; color: #11574e; }
+.bed-map-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.bed-map-stage { position: relative; min-width: 600px; }
+.bed-map-stage canvas { display: block; width: 100%; height: auto; }
+.bed-map-markers { position: absolute; inset: 0; pointer-events: none; }
+.bed-page .bed-map-marker {
+  position: absolute; transform: translate(-50%, -50%); display: grid; min-height: 30px;
+  padding: 2px 5px; pointer-events: auto; font-size: 11px; line-height: 1.25; white-space: nowrap;
+  border-color: currentColor; box-shadow: 0 1px 4px #19354223;
+}
+.bed-map-marker:hover, .bed-map-marker:focus-visible, .bed-map-marker[aria-pressed="true"] { z-index: 1; }
+.bed-map-marker[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.bed-map-marker strong { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; }
+#bedCounts, #chooseBed, #emptyBeds { color: #506978; }
+.table-scroll { overflow-x: auto; }
+.bed-page table { width: 100%; border-collapse: collapse; text-align: left; }
+.bed-page :is(th, td) { padding: 9px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.bed-page th { background: #eef4f5; white-space: nowrap; }
+#bedRows tr.selected { background: #eef8f6; }
+.bed-page td button { white-space: nowrap; }
+.occupancy { padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.bed-page :is(.occupancy, .bed-map-marker).occupied { color: #9e2837; background: #fbe7e9; }
+.bed-page :is(.occupancy, .bed-map-marker).pending { color: #795507; background: #fff1c7; }
+.bed-page :is(.occupancy, .bed-map-marker).vacant { color: #126353; background: #e8f5ef; }
+.bed-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bed-page .primary { background: var(--teal); border-color: var(--teal); color: white; }
+.bed-page .discharge { color: #a5212d; border-color: #e3adb3; }
+#patientForm { display: grid; gap: 12px; }
+.patient-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bed-page .check-label { display: flex; align-items: center; gap: 6px; }
+#patientFields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; }
+#patientFields dt { color: #506978; }
+#patientFields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bed-page .assessment { margin-top: 20px; padding: 12px; background: #f6f9fa; }
+.assessment h3 { margin: 0 0 6px; font-size: 14px; }
+.assessment p { margin: 6px 0; }
+.assessment ul { margin: 6px 0; padding-left: 20px; }
+@media (max-width: 850px) {
+  .bed-columns { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .bed-filters { grid-template-columns: 1fr 1fr; }
+  .bed-filters label:first-child { grid-column: 1 / -1; }
+  .bed-page :is(th, td) { padding: 7px 4px; }
+}

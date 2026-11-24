@@ -45,7 +45,7 @@ function workspaceFacts(map,config,snapshot,records=[],geometry=null) {
   for(const vehicle of enabled) {
     const level=map.floors.find(item=>item.id===vehicle.floor_id);
     const key=vehicle.floor_id+':'+vehicle.parking_id;
-    if(!models.has(vehicle.model_id)||!level?.objects.some(item=>item.kind==='parking'&&item.id===vehicle.parking_id)||occupied.has(key)) invalidIds.push(vehicle.id);
+    if(!models.has(vehicle.model_id)||!level?.objects.some(item=>item.kind==='parking'&&!item.charger&&item.id===vehicle.parking_id)||occupied.has(key)) invalidIds.push(vehicle.id);
     occupied.add(key);
   }
   const matches=!!map.version&&!!snapshot&&snapshot.map_id===map.id&&snapshot.map_version===map.version;
@@ -291,9 +291,6 @@ async function workspaceNextAction() {
     }
     await switchWorkspace('tasks');
   } else if(workspaceView==='tasks') {
-    if(!facts.saved)return switchWorkspace('map');
-    if(!facts.fleetReady)return switchWorkspace('fleet');
-    if(!facts.current)return prepareWorkspaceRun();
     if($('taskEditor').hidden)await $('newTask').onclick();else $('taskBedNumber').focus();
   } else if(workspaceView==='monitor') {
     if(!facts.current)return facts.saved&&facts.fleetReady?prepareWorkspaceRun():switchWorkspace(workspaceSuggestion(facts));
@@ -327,10 +324,11 @@ function renderWorkbench() {
   const texts={
     map:available?'下一步：配置车队 →':'保存地图并配置车队 →',
     fleet:needsMap?'先保存地图 →':!facts.fleetReady?(facts.invalid?'调整车辆与停车点':'配置车辆与停车点'):workspaceFleetSaved!==workspaceFleetStamp(configuration)?'保存车队并进入任务 →':'下一步：任务调度 →',
-    tasks:needsMap?'先保存地图 →':!facts.fleetReady?'先配置车队 →':!facts.current?'准备当前地图':'创建巡查任务',
+    tasks:needsMap?'先保存地图 →':'创建巡查任务',
     monitor:facts.current?'前往任务队列 →':needsMap?'先保存地图 →':'准备当前地图',replay:'刷新历史记录',archive:'刷新归档列表'};
   const changingRun=!!pendingRun||!!pendingEndRun;
-  $('workspaceNext').textContent=texts[workspaceView];$('workspaceNext').disabled=workspaceView!=='archive'&&changingRun;
+  $('workspaceNext').textContent=texts[workspaceView];
+  $('workspaceNext').disabled=changingRun&&!['archive','tasks'].includes(workspaceView);
   $('notice').classList.toggle('workspace-hidden',workspaceView!=='map'&&$('notice').textContent==='选择已有版本或从空白地图开始。保存地图后配置车辆并预览。');
   $('fleetPrepare').disabled=!!replay||!available||!facts.fleetReady||changingRun;
   $('start').disabled=!!replay||!available||!facts.fleetReady||changingRun;

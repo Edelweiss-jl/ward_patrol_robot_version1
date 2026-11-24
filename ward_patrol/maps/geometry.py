@@ -99,6 +99,7 @@ def validate(document):
                 geometry.append(f"{floor.get('id')} 楼层尺寸应在 1 至 100 米")
         room_numbers = set()
         parking_numbers = set()
+        charger_numbers = set()
         shaft_numbers = set()
         for obj in objects:
             if not isinstance(obj, dict):
@@ -128,6 +129,20 @@ def validate(document):
             if obj.get('kind') == 'bed' and 'patient' in obj:
                 if obj.get('bed_status') != 'occupied' or not valid_patient_details(obj['patient']):
                     structure.append(f'{identity} 的入住患者资料无效')
+            if 'charger' in obj:
+                charger = obj['charger']
+                if obj.get('kind') != 'parking' or not isinstance(charger, dict):
+                    structure.append(f'{identity} 充电桩必须绑定停车点')
+                else:
+                    number, rate = charger.get('number'), charger.get('rate')
+                    if not isinstance(number, str) or not 1 <= len(number.strip()) <= 24:
+                        structure.append(f'{identity} 充电桩编号须为 1 至 24 个字符')
+                    elif number.strip().casefold() in charger_numbers:
+                        structure.append(f'本楼层充电桩编号「{number.strip()}」重复')
+                    else:
+                        charger_numbers.add(number.strip().casefold())
+                    if type(rate) not in (int, float) or not 0 < rate <= 100:
+                        structure.append(f'{identity} 充电速率须大于 0 且不超过 100')
             if obj.get('kind') == 'door':
                 if not obj.get('wall_id'):
                     structure.append(f'{identity} 门必须引用墙')
@@ -185,6 +200,13 @@ def validate(document):
     if not structure and not geometry:
         for floor in document['floors']:
             rectangles=compile_floor(floor)
+            chargers = [point for point in floor['objects'] if 'charger' in point]
+            if chargers:
+                planner = Planner(floor, DEFAULT_MODELS[0])
+                for point in chargers:
+                    error = charger_placement_error(floor, point, planner)
+                    if error:
+                        geometry.append(point['charger']['number'] + '：' + error)
             for index, first in enumerate(rectangles):
                 for second in rectangles[index+1:]:
                     if first['kind']=='wall' and second['kind']=='wall':
@@ -247,6 +269,40 @@ def compile_floor(floor):
 
 def footprint(model):
     return math.hypot(model['width'], model['length'])/2 + model.get('margin', 0)
+
+
+def charger_approach(point, radius):
+    angle = math.radians(point.get('rotation', 0))
+    distance = max(.6, 2 * radius)
+    return point['x'] - distance * math.cos(angle), point['y'] - distance * math.sin(angle)
+
+
+def charger_placement_error(floor, point, planner):
+    goal = point['x'], point['y']
+    approach = charger_approach(point, planner.radius)
+    envelope = max(planner.radius, math.hypot(point['width'], point['height']) / 2)
+    by_id = {obj['id']: obj for obj in floor['objects']}
+    for obj in floor['objects']:
+        if obj['kind'] not in ('elevator', 'waiting', 'exit', 'single_lane', 'forbidden'):
+            continue
+        # Keep a maneuvering apron on both sides of the elevator threshold.
+        radius = envelope + (1.0 if obj['kind'] == 'elevator' else 0.)
+        if Planner._touches(approach, goal, obj, radius):
+            return ('充电位置和对接路线须避开电梯门口、候梯点及出梯区'
+                    if obj['kind'] in ('elevator', 'waiting', 'exit') else '充电位置和对接路线须避开禁行区及窄通道')
+        if obj['kind'] == 'elevator':
+            for identity in (obj.get('waiting_id'), obj.get('exit_id')):
+                marker = by_id.get(identity)
+                if marker:
+                    dx, dy = marker['x'] - obj['x'], marker['y'] - obj['y']
+                    passage = dict(x=obj['x'] + dx / 2, y=obj['y'] + dy / 2,
+                                   width=math.hypot(dx, dy), height=2 * planner.radius,
+                                   rotation=math.degrees(math.atan2(dy, dx)))
+                    if Planner._touches(approach, goal, passage, envelope):
+                        return '充电位置和对接路线须保留电梯进出通道'
+    if not planner.segment(approach, goal):
+        return '充电桩对接路线不可通行，请调整停车点或朝向'
+    return None
 
 
 class Planner:

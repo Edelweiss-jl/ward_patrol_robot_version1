@@ -49,6 +49,9 @@ class ParkingExecution:
     def _parking_open(self, robot, spot):
         floor, _ = spot
         point = self.parking_resources[spot]
+        if 'charger' in point or any(other != robot.robot_id and job.get('parking') == spot
+                                     for other, job in self.charge_jobs.items()):
+            return False
         if any(other != robot.robot_id and move['spot']==spot for other,move in self.parking_moves.items()):
             return False
         if any(other != robot.robot_id and (move['floor_id'],move['point_id'])==spot
@@ -84,6 +87,8 @@ class ParkingExecution:
 
     def parking_requirement(self, robot, model, floor, goal, travel, charge, reserve, *, allow_top_up=False):
         """Return the charge needed to reach the task and then a free parking point."""
+        if self.chargers:
+            return reserve + self.patrol_energy_needed(robot.robot_id, floor, goal, travel)
         ceiling = 100. if allow_top_up else charge
         remaining = (ceiling-reserve)/self.battery_use_per_meter-travel
         if remaining < -1e-9:
@@ -193,7 +198,7 @@ class ParkingExecution:
             self.move_robot(robot,task)
 
     def charging_spot(self, robot):
-        if robot.status not in ('idle','parked','charging') or robot.robot_id in self.parking_pending:
+        if self.chargers or robot.status not in ('idle','parked','charging') or robot.robot_id in self.parking_pending:
             return None
         floor = self.robot_floors[robot.robot_id]
         return next((key for key,point in self.parking_resources.items() if key[0]==floor and

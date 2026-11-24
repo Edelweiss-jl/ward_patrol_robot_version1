@@ -23,13 +23,13 @@
 
 ## 顺序验收
 
-1. 分别选择 N1-1 和 S3-2，将床位状态设为「已有入住」，填写年龄和诊断并保存。为两个床位创建巡查任务。两台车从各自停车点出发，任务表显示派车结果。
+1. 在床位管理的 corridor v1 为 N1-1 和 S3-2 登记仿真患者，再分别点击“确认入住”。在简易监控分别创建两床的巡查任务。两台车从各自停车点出发，任务表显示派车结果。
 2. 观察时间线依次出现 task_arrived、service_started、vitals_received、task_completed。体征事件显示模拟数值。车辆收到匹配回执后释放任务。
 3. 点击暂停，仿真秒数和步号冻结。此时 MQTT 回执可以进入队列，继续后在步边界应用。
 4. 选择 2 倍或 4 倍，观察相同墙钟时间内推进步数增多，步长仍为 1/60 秒。
 5. 点击手动采样。vitals_received 的 source 为 manual，任务完成数保持原值。
 6. 下载到站、体征、汇总和事件 CSV，按 task_id、attempt_id、sample_id 和 step 核对。页面显示 run_id，可据此定位记录目录。
-7. 重启 Web 后，切换床位检查已保存资料。资料在 outputs/runs/beds.json。
+7. 在患者详情检查巡检历史里的采样时间、机器人、任务及体征。重启 Web 后复查已保存的资料和巡检历史。办理出院后再次巡查该床，时间线应记录 `sample_skipped`。入住资料默认保存在 `outputs/bed_census.json`。
 
 ## 自动验证
 
@@ -68,6 +68,6 @@
 
 AMQTT 0.12.2 是实际运行的本地 MQTT broker。Paho 为 2.2.0。无需另装 Mosquitto。本阶段 GUI 键盘和浏览器视觉效果仍需人工验收，自动测试已验证 HTTP/SSE 与真实消息链路。资源预约和跨层执行按后续阶段实施。
 
-重复 sample_id 返回持久化结果。相同 command_id 重投会记录 command_duplicate。cancel_task 和 retry_task 接受 task_id，重试增加 attempt_id，旧尝试回执记录 receipt_late。已入住床位凭匹配任务和执行尝试的有效体征回执完成巡查。空床和入住未登记的床位到站后记录 bed_checked 并完成巡查。断链时请求保留，并周期重发等待回执的请求。
+重复 sample_id 返回持久化结果。相同 command_id 重投会记录 command_duplicate。cancel_task 和 retry_task 接受 task_id，重试增加 attempt_id，旧尝试回执记录 receipt_late。核心按 run_id、task_id、attempt_id、bed_id、robot_id、source、sample_id 和仿真资料版本核对回执。已入住床位需要非空体征，空床使用本地跳过回执。断链时请求保留，并周期重发等待回执的请求。
 
 验收通过后回复“阶段 1 验收通过，开始阶段 2”。

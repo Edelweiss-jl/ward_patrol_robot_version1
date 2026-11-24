@@ -14,6 +14,7 @@ let taskPicking = false, taskMapId = null, taskRequestId = null, taskSubmitting 
 let taskRecords = [], taskQueueRequest = 0, taskQueueTimer;
 const selectedSavedTasks = new Set();
 const taskBeds = new Set();
+let workbenchBeds = new Map(), workbenchBedsMap = '', workbenchBedsRequest = null;
 let pickingObstaclePosition = false, pendingSceneCommand = null;
 const labels = {wall:'墙',door:'门',bed:'床',furniture:'家具',parking:'停车点',service:'服务点',elevator:'电梯入口',waiting:'候梯点',exit:'出梯区域',forbidden:'禁行区',one_way:'单向区域',single_lane:'单车窄通道'};
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -54,6 +55,12 @@ async function compile() {
   return checkedGeometry;
 }
 function refresh(previous=$('floor').value) {
+  const census = $('bedCensusLink');
+  if (census) census.href = documentMap.version
+    ? '/beds?' + new URLSearchParams({map_id: documentMap.id, version: documentMap.version})
+    : '/beds';
+  if (typeof hideBedTooltip === 'function') hideBedTooltip();
+  void refreshWorkbenchBeds();
   ensureElevatorCatalog();
   syncMapOption();
   if (!replay && documentMap.version) localStorage.setItem('ward-editor-map-version',mapVersionKey(documentMap));
@@ -124,7 +131,7 @@ function draw() {
       continue;
     }
     if (o.kind==='elevator') continue;
-    const color={door:'#20a088',parking:'#677cc1',service:'#187d62',forbidden:'#e37e7e',one_way:'#d9b751',single_lane:'#9aa9d888',waiting:'#d4a640',exit:'#69a6b5'}[o.kind];
+    const color=o.charger?'#168277':{door:'#20a088',parking:'#677cc1',service:'#187d62',forbidden:'#e37e7e',one_way:'#d9b751',single_lane:'#9aa9d888',waiting:'#d4a640',exit:'#69a6b5'}[o.kind];
     rectangle(o,color,o.kind==='door');
     if (o.kind==='parking') {
       if(o.id===selected) rectangle(o,'#e34d43',true);
@@ -294,6 +301,7 @@ function addOtherProperties(form,level,object) {
   const parkingNumber = object.kind==='parking'
     ? field(form,'停车点编号','obj-parking-number',parkingNumbers(level).get(object.id)) : null;
   if (parkingNumber) {parkingNumber.required=true;parkingNumber.maxLength=24;}
+  const charger = parkingNumber && addChargerProperties(form,level,object,()=>parkingNumber.value.trim());
   const name = inspectorName(form,service?'服务点名称':'名称','obj-name',object);
   if (service) {
     const bed = level.objects.find(item=>item.kind==='bed' && item.id===object.bed_id);
@@ -354,9 +362,12 @@ function addOtherProperties(form,level,object) {
       const error = roomNumberError(level,roomNumber,object.id);
       if (error) throw Error(error);
     }
+    const chargerSettings = charger ? charger() : null;
     const original = clone(object);
     Object.assign(object,geometry(),{name:name.value.trim()});
     if (number) object.parking_number = number;
+    if (chargerSettings) object.charger = chargerSettings;
+    else if (charger) delete object.charger;
     if (roomNumber) object.room_number = roomNumber;
     else if (room) delete object.room_number;
     for (const [key,input] of refs) object[key]=input.value;
@@ -370,6 +381,98 @@ function addOtherProperties(form,level,object) {
     else moveDoors(original,object);
   };
 }
+function addChargerProperties(form,level,point,parkingNumber,prefix='obj',enabledByDefault=false) {
+  const enabled=field(form,'设为共享充电桩',prefix+'-charger','','checkbox');
+  enabled.checked=!!point.charger || enabledByDefault;
+  const settings=document.createElement('div');
+  form.append(settings);
+  const number=field(settings,'充电桩编号',prefix+'-charger-number',point.charger?.number || '');
+  number.maxLength=24;
+  number.placeholder='默认沿用停车点编号';
+  const rate=numericSetting(settings,'充电速率（百分点/仿真分钟）',prefix+'-charger-rate',point.charger?.rate ?? 20,0.01,100);
+  const synchronize=()=>{
+    settings.hidden=!enabled.checked;
+    number.disabled=rate.disabled=!enabled.checked;
+  };
+  enabled.onchange=synchronize;
+  synchronize();
+  return ()=>{
+    if (!enabled.checked) return null;
+    if (configuration.instances.some(vehicle=>vehicle.floor_id===level.id && vehicle.parking_id===point.id)) {
+      throw Error('请先解除车辆对此停车点的固定分配');
+    }
+    if (!Number.isFinite(rate.valueAsNumber) || rate.valueAsNumber<=0 || rate.valueAsNumber>100) {
+      throw Error('充电速率须大于 0 且不超过 100');
+    }
+    return {number:number.value.trim() || parkingNumber(),rate:rate.valueAsNumber};
+  };
+}
+
+$('openChargerSettings').onclick=()=>{
+  if (!documentMap || replay) return;
+  const map=documentMap, level=floor(), dialog=$('chargerSettings'), form=$('chargerSettingsForm');
+  const choice=$('chargerParkingPoint'), fields=$('chargerSettingsFields');
+  const status=$('chargerSettingsStatus'), submit=$('applyChargerSettings');
+  const points=level.objects.filter(point=>point.kind==='parking');
+  const numbers=parkingNumbers(level);
+  const fixed=new Set(configuration.instances.filter(vehicle=>vehicle.floor_id===level.id).map(vehicle=>vehicle.parking_id));
+  choice.replaceChildren();
+  for (const point of points) {
+    const label=numbers.get(point.id)+(point.charger?' · '+point.charger.number+'（充电桩）'
+      : fixed.has(point.id)?'（车辆固定停车点）':'');
+    const option=new Option(label,point.id);
+    option.disabled=fixed.has(point.id) && !point.charger;
+    choice.add(option);
+  }
+  const initial=[...choice.options].find(option=>!option.disabled && option.value===selected);
+  choice.value=initial?.value || [...choice.options].find(option=>!option.disabled)?.value || '';
+  choice.disabled=!choice.value;
+  let readCharger=null;
+  const update=()=>{
+    fields.replaceChildren();
+    const point=points.find(item=>item.id===choice.value);
+    submit.disabled=!point;
+    readCharger=point?addChargerProperties(fields,level,point,()=>numbers.get(point.id),'dialog',true):null;
+    status.textContent=point?'':points.length?'本层停车点均已分配给车辆。请新增停车点或解除固定分配。'
+      :'本层还没有停车点。请先从物品栏拖入停车点。';
+  };
+  choice.onchange=update;
+  const apply=async event=>{
+    event.preventDefault();
+    const point=points.find(item=>item.id===choice.value);
+    if (!dialog.open || submit.disabled || !point || !readCharger) return;
+    submit.disabled=choice.disabled=true;
+    const isCurrent=()=>dialog.open && form.onsubmit===apply;
+    try {
+      const charger=readCharger();
+      const candidate=clone(map);
+      const updated=candidate.floors.find(item=>item.id===level.id).objects.find(item=>item.id===point.id);
+      if (charger) updated.charger=charger;
+      else delete updated.charger;
+      const validation=await api('/api/maps/validate',candidate);
+      if (!isCurrent() || documentMap!==map || floor()!==level) return;
+      if (!validation.valid) throw Error([...validation.structure,...validation.geometry].join('\n'));
+      checkpoint();
+      if (charger) point.charger=charger;
+      else delete point.charger;
+      selected=point.id;
+      dirty();
+      dialog.close();
+      refresh();
+      await compile();
+      notice(charger?'充电桩已应用。点击「保存地图」保存设置。':'充电桩设置已移除。点击「保存地图」保存设置。');
+    } catch (error) {
+      if (isCurrent()) status.textContent=error.message;
+    } finally {
+      if (isCurrent()) submit.disabled=choice.disabled=false;
+    }
+  };
+  form.onsubmit=apply;
+  update();
+  dialog.showModal();
+};
+$('closeChargerSettings').onclick=()=>$('chargerSettings').close();
+
 function inspector() {
   const target = $('inspector');
   target.replaceChildren();
@@ -1133,7 +1236,7 @@ $('instanceEditor').addEventListener('cancel',event=>{
 });
 function freeParkingPoints(level,instances) {
   const reserved = new Set(instances.filter(item=>item.floor_id===level.id).map(item=>item.parking_id));
-  return level.objects.filter(item=>item.kind==='parking' && !reserved.has(item.id));
+  return level.objects.filter(item=>item.kind==='parking' && !item.charger && !reserved.has(item.id));
 }
 function openVehicle(id) {
   if (replay) return;
@@ -1158,7 +1261,7 @@ function renderFleetQueue(focusId) {
   }
   for (const instance of configuration.instances) {
     const level=documentMap.floors.find(item=>item.id===instance.floor_id);
-    const parking=level?.objects.find(item=>item.kind==='parking' && item.id===instance.parking_id);
+    const parking=level?.objects.find(item=>item.kind==='parking' && !item.charger && item.id===instance.parking_id);
     const model=configuration.models.find(item=>item.id===instance.model_id);
     const entry=document.createElement('button');
     entry.type='button';
@@ -1210,7 +1313,7 @@ action('saveInstance',()=>{
   if (!instance.id || !instance.model_id) throw Error('请填写车辆编号并选择车型');
   if ((creating || instance.enabled) && !instance.parking_id) throw Error('请先选择初始楼层和停车点');
   if (instance.parking_id && !documentMap.floors.some(level=>level.id===instance.floor_id &&
-      level.objects.some(point=>point.kind==='parking' && point.id===instance.parking_id))) {
+      level.objects.some(point=>point.kind==='parking' && !point.charger && point.id===instance.parking_id))) {
     throw Error('请选择该楼层的停车点');
   }
   if (instance.parking_id && configuration.instances.some((item,i)=>i!==index &&
@@ -1297,7 +1400,7 @@ function taskDestinations() {
   return documentMap.floors.flatMap(level=>level.objects.filter(object=>object.kind==='service')
     .map(service=>{
       const name=service.name||service.id;
-      return {id:service.id, floorId:level.id, bedId:service.bed_id||service.id,
+      return {id:service.id, floorId:level.id, bedId:service.bed_id||service.id, linkedBed:service.bed_id,
         name, label:level.name+' / '+name};
     }));
 }
@@ -1305,6 +1408,54 @@ function taskDestinations() {
 const taskRoomCache=new WeakMap();
 const normalizeTaskName=text=>text.trim().toLowerCase().replace(/\s*[/／]\s*/g,' / ');
 const taskBedKey=(floorId,bedId)=>JSON.stringify([floorId,bedId]);
+
+function workbenchBed(floorId, bedId) {
+  if (!documentMap?.version || workbenchBedsMap !== mapVersionKey(documentMap)) return undefined;
+  return workbenchBeds.get(taskBedKey(floorId, bedId));
+}
+
+function taskBedAvailability(destination) {
+  return !destination.linkedBed ? 'available'
+    : workbenchBed(destination.floorId, destination.linkedBed)?.status || 'unknown';
+}
+
+async function refreshWorkbenchBeds(force = false) {
+  if (!documentMap?.version || replay || document.hidden) return;
+  const key = mapVersionKey(documentMap);
+  if (!force && workbenchBedsMap === key) return;
+  if (workbenchBedsRequest?.key === key) return workbenchBedsRequest.promise;
+  const query = new URLSearchParams({map_id: documentMap.id, version: documentMap.version, summary: 1});
+  const request = {key};
+  workbenchBedsRequest = request;
+  request.promise = (async () => {
+    try {
+      const beds = await api('/api/bed-census?' + query, undefined, {cache:'no-store'});
+      if (replay || !documentMap.version || mapVersionKey(documentMap) !== key || workbenchBedsRequest !== request) return;
+      const availabilityChanged = workbenchBedsMap !== key ||
+        beds.some(bed=>workbenchBeds.get(taskBedKey(bed.floor_id,bed.bed_id))?.status !== bed.status);
+      workbenchBeds = new Map(beds.map(bed=>[taskBedKey(bed.floor_id,bed.bed_id),bed]));
+      workbenchBedsMap = key;
+      if (!$('taskEditor').hidden) {
+        refreshTaskSuggestions();
+        const removed = taskDestinations().filter(bed=>taskBeds.has(bed.id) && taskBedAvailability(bed)==='vacant');
+        if (removed.length) {
+          for (const bed of removed) taskBeds.delete(bed.id);
+          updateTaskBedSelection();
+          taskFeedback('以下床位已变为空床，已从选择中移除：'+removed.map(bed=>bed.label).join('、'),true);
+        }
+      }
+      if (typeof refreshBedTooltip === 'function') refreshBedTooltip();
+      if (availabilityChanged && !$('savedTaskQueue').hidden) void loadTaskRecords().catch(()=>{});
+    } catch {
+      if (force && workbenchBedsMap !== key && !$('taskEditor').hidden) {
+        taskFeedback('床位状态暂不可用，请稍后重试。',true);
+      }
+    } finally {
+      if (workbenchBedsRequest === request) workbenchBedsRequest = null;
+    }
+  })();
+  return request.promise;
+}
 
 function taskRoomRegions(level) {
   // Keep door openings closed in the wall raster so adjacent rooms stay separate.
@@ -1419,7 +1570,9 @@ function refreshTaskSuggestions() {
   const input=$('taskBedNumber');
   input.placeholder={bed:'如 二层 / N2-1',room:'如 二层 / N2',floor:'如 二层'}[type];
   input.setAttribute('aria-label','手动输入'+taskInputLabels[type]);
-  const suggestions=[...new Set(taskInputChoices(type).map(item=>item.label))];
+  const choices=taskInputChoices(type);
+  const suggestions=[...new Set(choices.filter(item=>type!=='bed' ||
+    !['vacant','unknown'].includes(taskBedAvailability(item))).map(item=>item.label))];
   $('taskBedOptions').replaceChildren(...suggestions.map(label=>new Option(label,label)));
 }
 
@@ -1469,7 +1622,11 @@ function selectTaskBeds(ids,missing=0) {
     if (!bed || seen.has(key(bed))) continue;
     const bedKey=key(bed);
     seen.add(bedKey);
-    if (selected.has(bedKey)) {
+    const availability=taskBedAvailability(bed);
+    if (availability==='vacant' || availability==='unknown') {
+      warnings.push(bed.label+(availability==='vacant'?' 是空床，未加入任务。'
+        : documentMap.version?' 的床位状态暂不可用。':' 需要先保存地图并查询床位状态。'));
+    } else if (selected.has(bedKey)) {
       const existing=selected.get(bedKey);
       duplicates.push(existing.id);
       warnings.push(existing.label+' 重复选择');
@@ -1541,6 +1698,10 @@ function openTaskPanel(panel) {
 }
 action('newTask',async()=>{
   if (replay || taskSubmitting || !documentMap) return;
+  if (!documentMap.version) {
+    taskFeedback('请先保存地图，再创建巡查任务。',true);
+    return;
+  }
   const open=$('taskEditor').hidden;
   openTaskPanel(open?'taskEditor':null);
   if (open) {
@@ -1550,7 +1711,7 @@ action('newTask',async()=>{
   }
   taskFeedback();
   if (open) {
-    try {await loadTaskRecords();}
+    try {await Promise.all([loadTaskRecords(), refreshWorkbenchBeds(true)]);}
     catch (error) {taskFeedback(error.message);}
   }
 });
@@ -1610,6 +1771,7 @@ $('addTaskBed').onsubmit=event=>{
 };
 
 function readEditorTask() {
+  if (!documentMap.version) throw Error('请先保存当前地图版本。');
   if ($('taskBedNumber').value.trim()) throw Error('请先点「添加」将手动输入的巡检范围加入清单。');
   const beds=[...taskBeds];
   if (!beds.length) throw Error('请至少选择一个床位。');
@@ -1618,27 +1780,29 @@ function readEditorTask() {
     throw Error('每项任务最多包含 1000 个床位巡检项，发布间隔须为非负数。');
   }
   const labels=new Map(taskDestinations().map(bed=>[bed.id,bed.label]));
-  return {request_id:taskRequestId,map_id:documentMap.id,beds,bed_labels:beds.map(id=>labels.get(id)),
+  return {request_id:taskRequestId,map_id:documentMap.id,map_version:documentMap.version,beds,bed_labels:beds.map(id=>labels.get(id)),
     notes:$('taskNotes').value,
     count,period,task:taskFields()};
 }
 
+const publishableTask = record => ['saved','queued'].includes(record.status);
 function updateTaskActions() {
   $('saveTask').disabled=taskSubmitting||!!replay;
-  $('publishSelectedTasks').hidden=!taskRecords.some(record=>record.status==='saved')||!!replay;
+  $('publishSelectedTasks').hidden=!taskRecords.some(publishableTask)||!!replay;
   $('publishSelectedTasks').disabled=taskSubmitting||!!replay||!selectedSavedTasks.size;
 }
 
 async function loadTaskRecords() {
-  const mapId=documentMap.id, request=++taskQueueRequest;
+  const mapId=documentMap.id, version=documentMap.version, request=++taskQueueRequest;
   clearTimeout(taskQueueTimer);
   taskQueueTimer=undefined;
   try {
-    const records=await api('/api/editor/tasks?map_id='+encodeURIComponent(mapId),undefined,{cache:'no-store'});
-    if (replay || documentMap.id!==mapId || request!==taskQueueRequest) return;
+    const query=new URLSearchParams({map_id:mapId,map_version:version});
+    const records=await api('/api/editor/tasks?'+query,undefined,{cache:'no-store'});
+    if (replay || documentMap.id!==mapId || documentMap.version!==version || request!==taskQueueRequest) return;
     const previous=new Map(taskRecords.map(record=>[record.id,record.status]));
     taskRecords=records;
-    const saved=new Set(records.filter(record=>record.status==='saved').map(record=>record.id));
+    const saved=new Set(records.filter(publishableTask).map(record=>record.id));
     for (const id of selectedSavedTasks) if (!saved.has(id)) selectedSavedTasks.delete(id);
     const resolved=records.filter(record=>
       previous.get(record.id)==='publishing' && record.status!=='publishing' ||
@@ -1649,7 +1813,7 @@ async function loadTaskRecords() {
     renderTaskQueues(viewingCurrentRun());
     scheduleTaskQueueRefresh();
   } catch(error) {
-    if (documentMap.id===mapId && request===taskQueueRequest) scheduleTaskQueueRefresh();
+    if (documentMap.id===mapId && documentMap.version===version && request===taskQueueRequest) scheduleTaskQueueRefresh();
     throw error;
   }
 }
@@ -1672,7 +1836,7 @@ async function publishEditorTasks(ids, mapId) {
   taskFeedback(result.submitted?'已提交，等待仿真确认。':'所选任务已发布或正在发布。');
   await loadTaskRecords();
   const selected=taskRecords.filter(record=>ids.includes(record.id));
-  const rejected=selected.find(record=>record.status==='saved' && record.error);
+  const rejected=selected.find(record=>publishableTask(record) && record.error);
   if (rejected) taskFeedback('发布失败，任务仍保存在队列中。'+rejected.error);
   else if (selected.length && selected.every(record=>record.status==='published')) taskFeedback('任务已发布。');
 }
@@ -1810,7 +1974,7 @@ function renderSavedTasks(records,groups) {
     const done=visitStates.filter(status=>status==='completed').length;
     const ended=total>0 && visitStates.length===total &&
       visitStates.every(value=>['completed','cancelled','expired'].includes(value));
-    let status=record.request_id && record.status!=='published'?'待分配':statuses[record.status];
+    let status=record.status==='queued' && !state?.started?'待发布':statuses[record.status];
     if (record.completed || (total && done===total)) status='已完成';
     else if (visitStates.includes('assigned')) status='执行中';
     else if (visitStates.includes('pending')) status='待分配';
@@ -1818,9 +1982,10 @@ function renderSavedTasks(records,groups) {
     else if (ended && visitStates.every(value=>value==='expired')) status='已超时';
     else if (ended) status='已结束（部分床位未完成）';
     if (record.bed_conflicts?.length && !visits.length) status+=' · 床位冲突';
+    if (record.vacant_beds?.length && !visits.length) status+=' · 等待床位登记';
     const progress=done+' / '+total;
     summary.textContent=[displayNumber,record.task.content||'巡查',status,progress].join(' · ');
-    if (record.status==='saved' && !replay) {
+    if (publishableTask(record) && !replay) {
       const label=document.createElement('label');
       const checkbox=document.createElement('input');
       checkbox.type='checkbox';
@@ -1898,13 +2063,15 @@ function appendTaskRecordDetails(parent,record,{displayNumber,status,progress,sh
   const items=document.createElement('ul');
   items.className='task-list';
   const conflicts=new Map((record.bed_conflicts||[]).map(item=>[item.bed_id,item.task_number]));
+  const vacant=new Set((record.vacant_beds||[]).map(item=>item.bed_id));
   for (const [index,label] of (showBeds?record.bed_labels||[]:[]).entries()) {
     const item=document.createElement('li');
     const owner=conflicts.get(record.beds[index]);
-    const reason=owner?'重复选择（未完成任务 '+owner+'）':
+    const isVacant=vacant.has(record.beds[index]);
+    const reason=isVacant?'空床，暂缓分配':owner?'重复选择（未完成任务 '+owner+'）':
       status.startsWith('待分配')?(record.error||waiting):'';
     item.textContent=[label,reason].filter(Boolean).join(' · ');
-    if (owner) item.classList.add('duplicate-task-bed');
+    if (owner || isVacant) item.classList.add('duplicate-task-bed');
     items.append(item);
   }
   if (showBeds) parent.append(items);
@@ -2204,6 +2371,15 @@ function renderState() {
     .map(robot=>robot.id+' 电量 '+robot.battery_percent+'%（最低 '+robot.safety_battery_percent+'%）').join(' · ') : '';
   const fleet=$('fleetBattery');
   if (fleet.textContent!==batteryText) fleet.textContent=batteryText;
+  const chargerStatus=$('chargingStatus');
+  const phases={free:'空闲',to_charger:'已预约',charging:'充电中',charged:'等待驶离',leaving:'驶离中'};
+  const chargerLines=visible ? (state?.chargers||[]).map(point=>{
+    const level=documentMap.floors.find(f=>f.id===point.floor_id)?.name || point.floor_id;
+    return [level+' / '+point.number,phases[point.status],point.robot_id].filter(Boolean).join(' ');
+  }) : [];
+  if (visible) for (const [identity,reason] of Object.entries(state?.charging_waits||{})) chargerLines.push(identity+' '+reason);
+  const chargerText=chargerLines.join(' · ');
+  if (chargerStatus.textContent!==chargerText) chargerStatus.textContent=chargerText;
   const coverage=visible?state?.floor_coverage:null;
   const floorName=id=>documentMap.floors.find(item=>item.id===id)?.name||id;
   const coverageText=coverage?[
@@ -2277,6 +2453,9 @@ async function initialize(){
   documentMap=initialMap ? clone(initialMap) : await api('/api/maps/blank',{name:'自定义病区'});
   delete documentMap.display_name;mapOptions();refresh();configOptions();await compile();
   notice('选择已有版本或从空白地图开始。保存地图后配置车辆并预览。');
+  window.setInterval(()=>void refreshWorkbenchBeds(true), 5000);
+  window.addEventListener('focus',()=>void refreshWorkbenchBeds(true));
+  document.addEventListener('visibilitychange',()=>void refreshWorkbenchBeds(true));
   const events=new EventSource('/api/stream');
   events.onopen=()=>{if(typeof workspaceSetConnection==='function')workspaceSetConnection(true);};
   events.onerror=()=>{if(typeof workspaceSetConnection==='function')workspaceSetConnection(false);};

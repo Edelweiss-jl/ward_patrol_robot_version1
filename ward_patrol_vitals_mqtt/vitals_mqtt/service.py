@@ -27,10 +27,11 @@ class VitalsService:
         self.bus = None
 
     # ---- 核心处理 ----
-    def process_arrival(self, bed_id, robot_id=None, seq=0, sim_time=None):
+    def process_arrival(self, bed_id, robot_id=None, seq=0, sim_time=None, profile=None):
         """一次到站采样：生成体征、判定、登记，返回发布用的状态消息。"""
-        sample = self.generator.generate(bed_id, seq=seq, robot_id=robot_id, sim_time=sim_time)
-        verdict = self.analyzer.analyze(sample["vitals"], sample.get("scenario", "routine"))
+        sample = self.generator.generate(bed_id, seq=seq, robot_id=robot_id, sim_time=sim_time,
+                                         profile=profile)
+        verdict = self.analyzer.analyze(sample["vitals"], sample["scenario"], profile=profile)
         status_msg = protocol.status_message(bed_id, verdict, robot_id=robot_id,
                                              seq=seq, sim_time=sim_time)
         self.registry.update(bed_id, status_msg)
@@ -47,6 +48,7 @@ class VitalsService:
             robot_id=msg.get("robot_id"),
             seq=msg.get("seq", 0),
             sim_time=msg.get("sim_time"),
+            profile=msg.get("profile"),
         )
         self._publish_status(status_msg, sample)
 
@@ -58,7 +60,7 @@ class VitalsService:
 
         vitals = status_msg["vitals"]
         flag = "ABNORMAL" if status_msg["abnormal"] else "normal"
-        detail = "；".join(status_msg["reasons"]) or "各项指标在正常范围"
+        detail = "；".join(status_msg["reasons"]) or "当前项目未触发预警"
         print(f"[BED {status_msg['bed_id']}] {flag} / {status_msg['status']} "
               f"HR={vitals.get('heart_rate')} SpO2={vitals.get('spo2')} "
               f"BP={vitals.get('systolic_bp')}/{vitals.get('diastolic_bp')} "
@@ -69,8 +71,6 @@ class VitalsService:
         entry = dict(status_msg)
         entry["event"] = "vitals_record"
         entry["scenario"] = sample.get("scenario")
-        entry["findings"] = self.analyzer.analyze(sample["vitals"],
-                                                  sample.get("scenario", "routine"))["findings"]
         self.records.append(entry)
         if self._record_file:
             self._record_file.write(json.dumps(entry, ensure_ascii=False) + "\n")

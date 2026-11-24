@@ -1,13 +1,4 @@
-"""模拟体征生成：心率、血氧、血压（收缩/舒张）、呼吸频率、体温。
-
-正常值按用户给定的区间采样：
-心率 60~100 bpm、血氧 95~100%、收缩压 90~139 mmHg、
-舒张压 60~89 mmHg、呼吸 16~20 次/分、体温 36.0~37.0 ℃。
-
-异常不是逐项随机抖动，而是按临床情景成组出现（低氧、高血压、
-发热、心动过缓、低血压），这样多个指标之间有关联，判定结果更可信。
-"""
-
+"""Reproducible synthetic bedside measurements and correlated scenarios."""
 from __future__ import annotations
 
 import random
@@ -15,20 +6,38 @@ import re
 import zlib
 
 from . import protocol
+from .vitals_reference import age_in_months, pediatric_ranges, resting_pulse_range
 
-# 情景 -> 受影响的指标。severe 表示沿用本次抽到的严重度，mild 固定为预警。
+
+ROUTINE = {
+    'heart_rate': (60, 90), 'spo2': (96, 100), 'systolic_bp': (111, 135),
+    'diastolic_bp': (60, 85), 'respiratory_rate': (12, 20), 'temperature': (36.1, 37.4),
+}
+# Each scenario has two simulation intensities. The analyzer assigns the actual level.
 SCENARIOS = {
-    "hypoxia": [("spo2", "low", "severe"),
-                ("heart_rate", "high", "mild"),
-                ("respiratory_rate", "high", "mild")],
-    "hypertension": [("systolic_bp", "high", "severe"),
-                     ("diastolic_bp", "high", "mild")],
-    "fever": [("temperature", "high", "severe"),
-              ("heart_rate", "high", "mild"),
-              ("respiratory_rate", "high", "mild")],
-    "bradycardia": [("heart_rate", "low", "severe")],
-    "hypotension": [("systolic_bp", "low", "severe"),
-                    ("diastolic_bp", "low", "mild")],
+    'hypoxia': (
+        dict(spo2=(92, 93), heart_rate=(91, 110), respiratory_rate=(21, 24)),
+        dict(spo2=(85, 91), heart_rate=(111, 130), respiratory_rate=(25, 28))),
+    'hypertension': (
+        dict(systolic_bp=(160, 179), diastolic_bp=(90, 105)),
+        dict(systolic_bp=(220, 230), diastolic_bp=(110, 125))),
+    'fever': (
+        dict(temperature=(38.1, 39.0), heart_rate=(91, 110), respiratory_rate=(21, 24)),
+        dict(temperature=(39.1, 40.0), heart_rate=(111, 130), respiratory_rate=(25, 28))),
+    'bradycardia': (
+        dict(heart_rate=(41, 50)),
+        dict(heart_rate=(30, 40))),
+    'hypotension': (
+        dict(systolic_bp=(91, 100), diastolic_bp=(45, 55)),
+        dict(systolic_bp=(70, 90), diastolic_bp=(35, 49), heart_rate=(111, 130),
+             respiratory_rate=(21, 24))),
+}
+PEDIATRIC_DIRECTIONS = {
+    'hypoxia': dict(heart_rate=1, respiratory_rate=1),
+    'fever': dict(heart_rate=1, respiratory_rate=1),
+    'hypertension': dict(systolic_bp=1),
+    'bradycardia': dict(heart_rate=-1),
+    'hypotension': dict(systolic_bp=-1),
 }
 
 # 诊断关键词只用于选择模拟情景。体征范围和分级仍来自配置。
@@ -53,122 +62,79 @@ def _diagnosis_scenarios(profile):
 
 
 def _normal_modes(profile, scenarios):
-    age = profile.get("age")
+    age = age_in_months(profile)
     shifts = {}
-    if type(age) is int and 0 <= age < 13:
+    if type(age) is int and 0 <= age < 13 * 12:
         shifts.update(heart_rate=.25, respiratory_rate=.25, systolic_bp=-.2, diastolic_bp=-.15)
-    elif type(age) is int and 65 <= age <= 130:
+    elif type(age) is int and 65 * 12 <= age <= 130 * 12:
         shifts.update(systolic_bp=.2, spo2=-.15)
     for scenario in sorted(scenarios):
-        for key, direction, _ in SCENARIOS[scenario]:
-            shift = .18 if direction == "high" else -.18
+        for key, band in SCENARIOS[scenario][0].items():
+            shift = .18 if sum(band) > sum(ROUTINE[key]) else -.18
             shifts[key] = shifts.get(key, 0) + shift
     return {key: min(.95, max(.05, .5 + shift)) for key, shift in shifts.items()}
 
 
-def _decimals(spec):
-    return int(spec.get("decimals", 0))
-
-
-def _step(spec):
-    """最小可分辨间隔：整数型指标为 1，带小数的为其精度。"""
-    d = _decimals(spec)
-    return 1 if d <= 0 else 10 ** -d
-
-
-def _round(spec, value):
-    return round(value, _decimals(spec))
-
-
 class VitalsGenerator:
-    """按床位生成一组体征；同一床位可复现（seed + 床位号 + 序号）。"""
-
     def __init__(self, cfg):
-        self.cfg = cfg
-        gen = cfg.get("generator", {})
-        self.abnormal_rate = float(gen.get("abnormal_rate", 0.3))
-        self.critical_ratio = float(gen.get("critical_ratio", 0.35))
-        self.seed = gen.get("seed")
-        self.scenarios = list(gen.get("scenarios") or SCENARIOS.keys())
-        self.metrics = cfg["metrics"]
-
-    # 同一床位的随机流互不干扰：用床位名做稳定散列，不用内置 hash。
-    def _rng(self, bed_id, seq):
-        base = int(self.seed) if self.seed is not None else 0
-        return random.Random(base + zlib.crc32(str(bed_id).encode("utf-8")) + int(seq) * 7919)
-
-    def _normal(self, spec, rng, mode=None):
-        lo, hi = map(float, spec["normal"])
-        value = rng.uniform(lo, hi) if mode is None else rng.triangular(lo, hi, lo + (hi - lo) * mode)
-        return _round(spec, value)
-
-    def _band(self, spec, direction, critical):
-        """返回 (下界, 上界)；区间无效时返回 None（如血氧不会偏高）。"""
-        lo_n, hi_n = float(spec["normal"][0]), float(spec["normal"][1])
-        step = _step(spec)
-        span = max((hi_n - lo_n) * 0.4, step * 3)
-        if direction == "high":
-            top = float(spec["critical_above"])
-            warn = (hi_n + step, top - step)
-            crit = (top, top + span)
-        else:
-            bottom = float(spec["critical_below"])
-            warn = (bottom + step, lo_n - step)
-            crit = (max(0.0, bottom - span), bottom - step)
-        lo, hi = crit if critical else warn
-        if hi <= lo:
-            return (lo, lo) if hi == lo else None
-        return (lo, hi)
-
-    def _abnormal_value(self, spec, direction, critical, rng):
-        band = self._band(spec, direction, critical)
-        if band is None:
-            return None
-        lo, hi = band
-        return _round(spec, rng.uniform(lo, hi))
+        gen = cfg.get('generator', {})
+        self.abnormal_rate = float(gen.get('abnormal_rate', 0.3))
+        self.critical_ratio = float(gen.get('critical_ratio', 0.35))
+        self.seed = int(gen.get('seed') or 0)
+        self.scenarios = [name for name in (gen.get('scenarios') or SCENARIOS) if name in SCENARIOS]
+        self.metrics = cfg['metrics']
 
     def generate(self, bed_id, seq=0, robot_id=None, sim_time=None,
                  abnormal=None, critical=None, scenario=None, profile=None):
-        """生成一次采样，返回 protocol.vitals_message 格式的消息。
-
-        abnormal / critical / scenario 可显式指定，便于演示与测试；
-        提供患者年龄和诊断时，调整正常区间内的取值与异常情景的采样权重。
-        """
         seq = int(seq)
-        rng = self._rng(bed_id, seq)
+        rng = random.Random(self.seed + zlib.crc32(str(bed_id).encode('utf-8')) + seq * 7919)
         profile = profile if isinstance(profile, dict) else {}
-        pool = [s for s in self.scenarios if s in SCENARIOS] or ["hypoxia"]
+        pool = self.scenarios or ['hypoxia']
         matching = _diagnosis_scenarios(profile).intersection(pool)
         modes = _normal_modes(profile, matching)
-        chosen_scenario = "routine"
-        touched = {}
+        pediatric = pediatric_ranges(profile)
+        bands = dict(ROUTINE)
+        if pediatric:
+            bands.update(pediatric)
+            bands['diastolic_bp'] = (35, 65)
+        elif (pulse := resting_pulse_range(profile)):
+            bands['heart_rate'] = (max(pulse[0], 51), min(pulse[1], 90))
 
         if abnormal is None:
             rate = self.abnormal_rate
             if matching:
                 rate = 2 * rate / (1 + rate)
             abnormal = rng.random() < rate
+        chosen = 'routine'
         if abnormal:
             if critical is None:
                 critical = rng.random() < self.critical_ratio
             if scenario in SCENARIOS:
-                chosen_scenario = scenario
+                chosen = scenario
             elif matching:
-                chosen_scenario = rng.choices(pool, weights=[8 if s in matching else 1 for s in pool])[0]
+                chosen = rng.choices(pool, weights=[8 if name in matching else 1 for name in pool])[0]
             else:
-                chosen_scenario = rng.choice(pool)
-            for key, direction, severity in SCENARIOS[chosen_scenario]:
-                spec = self.metrics.get(key)
-                if spec is None:
-                    continue
-                value = self._abnormal_value(spec, direction, critical and severity == "severe", rng)
-                # 预警档区间可能为空（例如血氧偏高），此时退回正常值。
-                if value is not None:
-                    touched[key] = value
+                chosen = rng.choice(pool)
+            deviations = dict(SCENARIOS[chosen][bool(critical)])
+            if pediatric:
+                for key in pediatric:
+                    deviations.pop(key, None)
+                for key, direction in PEDIATRIC_DIRECTIONS[chosen].items():
+                    lo, hi = pediatric[key]
+                    edge = hi if direction > 0 else lo
+                    distance = 12 if critical else 4
+                    deviations[key] = tuple(sorted((edge + direction, edge + direction * distance)))
+            bands.update(deviations)
 
         vitals = {}
-        for key, spec in self.metrics.items():
-            vitals[key] = touched[key] if key in touched else self._normal(spec, rng, modes.get(key))
-
-        return protocol.vitals_message(bed_id, vitals, chosen_scenario,
-                                       robot_id=robot_id, seq=seq, sim_time=sim_time)
+        for key, band in bands.items():
+            if key in self.metrics:
+                digits = 1 if key in ('spo2', 'temperature') else 0
+                lo, hi = band
+                mode = modes.get(key)
+                value = rng.uniform(lo, hi) if mode is None else rng.triangular(lo, hi, lo + (hi - lo) * mode)
+                vitals[key] = round(value, digits)
+        if 'systolic_bp' in vitals and 'diastolic_bp' in vitals:
+            vitals['diastolic_bp'] = min(vitals['diastolic_bp'], vitals['systolic_bp'] - 5)
+        return protocol.vitals_message(bed_id, vitals, chosen, robot_id=robot_id,
+                                       seq=seq, sim_time=sim_time)

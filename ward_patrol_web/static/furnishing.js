@@ -1214,6 +1214,58 @@ function bedAtPointer(level, pointer, elevated, projection=transform(), topOffse
   }
   return beds.findLast(object=>containsPoint(object,ground));
 }
+
+const bedHover = $('bedHover');
+let hoveredBed = null, bedHoverTimer;
+function hideBedTooltip() {
+  clearTimeout(bedHoverTimer);
+  bedHover.hidden=true;
+  hoveredBed=null;
+}
+function leaveBedTooltip() {
+  if (!hoveredBed || bedHover.contains(document.activeElement)) return;
+  clearTimeout(bedHoverTimer);
+  bedHoverTimer=setTimeout(hideBedTooltip,350);
+}
+function refreshBedTooltip() {
+  if (!hoveredBed) return;
+  const info=workbenchBed(hoveredBed.floorId,hoveredBed.bedId);
+  $('bedHoverStatus').textContent={vacant:'空床',pending:'已登记待入住',occupied:'已入住'}[info?.status]
+    || '正在同步床位状态…';
+  const patient=info?.patient;
+  $('bedHoverPatient').textContent=patient ? [
+    patient.name, patient.age_months<12?patient.age_months+' 月龄':patient.age_months/12+' 岁',
+    {female:'女',male:'男',unknown:'性别未记录'}[patient.sex],
+  ].filter(Boolean).join(' · ') : '';
+}
+function showBedTooltip(bed,event,result) {
+  const level=floor();
+  clearTimeout(bedHoverTimer);
+  hideModelTooltip();
+  if (hoveredBed?.bedId===bed.id && hoveredBed.floorId===level.id) {
+    refreshBedTooltipVitals(result);
+    return;
+  }
+  hoveredBed={floorId:level.id,bedId:bed.id};
+  $('bedHoverName').textContent=bedDisplayName(bed,level);
+  const query=new URLSearchParams({map_id:documentMap.id,version:documentMap.version,
+    bed_key:JSON.stringify([documentMap.id,level.id,bed.id])});
+  $('bedHoverLink').href='/beds?'+query;
+  refreshBedTooltip();
+  refreshBedTooltipVitals(result);
+  bedHover.hidden=false;
+  bedHover.style.left=Math.max(8,Math.min(event.clientX+12,window.innerWidth-bedHover.offsetWidth-8))+'px';
+  bedHover.style.top=Math.max(8,Math.min(event.clientY+12,window.innerHeight-bedHover.offsetHeight-8))+'px';
+}
+function refreshBedTooltipVitals(result) {
+  const value=result?Object.values(bedInspectionDetails(result)).filter(Boolean).join(' · '):'';
+  if ($('bedHoverVitals').textContent!==value) $('bedHoverVitals').textContent=value;
+}
+bedHover.onpointerenter=()=>clearTimeout(bedHoverTimer);
+bedHover.onpointerleave=leaveBedTooltip;
+bedHover.onfocusin=()=>clearTimeout(bedHoverTimer);
+bedHover.onfocusout=()=>setTimeout(leaveBedTooltip,0);
+document.addEventListener('keydown',event=>{if (event.key==='Escape') hideBedTooltip();});
 function pickCanvasTaskRoom(event) {
   const position=world(event);
   const door=doorAtRoomLabel(position) || doorAtPosition(position);
@@ -1227,6 +1279,7 @@ function pickCanvasTaskRoom(event) {
 }
 canvas.onpointerdown = event => {
   hideModelTooltip();
+  hideBedTooltip();
   if (event.button!==0 || cameraDrag) return;
   if (buildingOverview) {
     const level = overviewFloorAt(canvasPosition(event));
@@ -1283,10 +1336,15 @@ canvas.onpointermove = event => {
   if (event.pointerType!=='mouse' || event.buttons || !documentMap || dragging || calibration ||
       buildingGesture || catalogDrag || buildMode!=='select' || $('tool').value!=='select') {
     hideModelTooltip();
+    hideBedTooltip();
     return;
   }
   hoveredCanvasPointer = {clientX:event.clientX,clientY:event.clientY};
-  refreshCanvasTooltip(bedVitalsOnFloor(floor(),visibleBedVitals()));
+  const results = bedVitalsOnFloor(floor(),visibleBedVitals());
+  const bed = documentMap.version && !replay ? bedAtPointer(floor(),event,raisedView) : null;
+  if (bed) {showBedTooltip(bed,event,results.get(bed.id));return;}
+  if (hoveredBed) {leaveBedTooltip();return;}
+  refreshCanvasTooltip(results);
 };
 function refreshCanvasTooltip(results) {
   const pointer=hoveredCanvasPointer;
@@ -1312,6 +1370,7 @@ function showBedInspection(level, bed, inspection, pointer) {
 }
 canvas.addEventListener('pointerleave',()=>{
   hideModelTooltip();
+  leaveBedTooltip();
   if (buildingOverview && hoveredLevel) {hoveredLevel=null;updateCanvasCursor();draw();}
 });
 function endCameraDrag(event) {
@@ -1460,7 +1519,9 @@ function drawFleet(level,showLabels=true) {
     for (const spot of parking) {
       const [x,y]=project3(spot.x,spot.y,0,projection);
       ctx.fillStyle='#25424f';
-      ctx.fillText(numbers.get(spot.id),x,y+spot.height*projection.scale/2+9);
+      const charger=(state?.chargers||[]).find(item=>item.id===spot.id && item.floor_id===level.id);
+      if (spot.charger) ctx.fillStyle=charger?.robot_id?'#9d6a19':'#116c65';
+      ctx.fillText(spot.charger?'充电 '+spot.charger.number:numbers.get(spot.id),x,y+spot.height*projection.scale/2+9);
     }
   }
   for (const robot of robots) {
@@ -1952,7 +2013,7 @@ function drawPerception(level) {
   }
 }
 function visibleBedVitals() {
-  return (replay || matchesCurrentMapRun()) ? latestVitals(state?.samples) : new Map();
+  return (replay || matchesCurrentMapRun()) ? latestVitals(state?.samples, state?.bed_revisions) : new Map();
 }
 function bedInspectionHeight(bed) {return objectHeight(bed)+.28;}
 function drawBedVitals(level,beds,elevated) {
@@ -1970,7 +2031,7 @@ function drawBedVitals(level,beds,elevated) {
     ctx.stroke();
     const [x,y] = project3(object.x,object.y,height);
     ctx.fillStyle=color;
-    const width = ctx.measureText(label).width+10;
+    const width = Math.max(34, ctx.measureText(label).width + 10);
     ctx.fillRect(x-width/2,y-8,width,16);
     ctx.fillStyle='#fff';
     ctx.fillText(label,x,y+4);
@@ -2003,6 +2064,7 @@ draw = function() {
     drawTaskBedSelection(floor());
     const results = bedVitalsOnFloor(floor(),visibleBedVitals());
     drawBedVitals(floor(),results,raisedView);
+    if (hoveredBed?.floorId===floor().id) refreshBedTooltipVitals(results.get(hoveredBed.bedId));
     drawModelingGuides();
     drawDoorRoomLabels(floor());
     drawScaleBar(frameProjection.scale);

@@ -1,4 +1,5 @@
 """Persistent map, fleet, template and saved-run HTTP operations."""
+from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
@@ -13,6 +14,7 @@ from ward_patrol.maps.elevators import elevator_action
 from ward_patrol.runtime.editable import normalize_patrol_fields, validate_models, validate_parking_assignments, validate_setup
 from ward_patrol.runtime.elevator import Ride, build_elevators, cross_floor_route
 from ward_patrol_web.run_visibility import visible_run_data
+from ward_patrol_web.census import BedCensus, service_beds
 
 
 TASK_NUMBER_TIMEZONE = timezone(timedelta(hours=8))
@@ -26,11 +28,18 @@ class TaskBedConflict(ValueError):
                                   for item in conflicts))
 
 
+class VacantTaskBeds(ValueError):
+    def __init__(self, beds):
+        self.conflicts = beds
+        super().__init__('空床不能加入巡查队列：' + '、'.join(item['label'] for item in beds))
+
+
 class Workspace:
     def __init__(self, root='outputs'):
         self.root=Path(root)
         self.maps=MapStore(self.root/'maps')
-        self.lock=threading.Lock()
+        self.lock=threading.RLock()
+        self.census = BedCensus(self)
         legacy_templates = ('corridor', 'ring')
         templates = list(hospital_templates())
         self.template_ids = {*legacy_templates, *(template['id'] for template in templates)}
@@ -43,6 +52,15 @@ class Workspace:
 
     def _is_template(self, version):
         return version['version'] == 1 and version['id'] in self.template_ids
+
+    def census_map(self, map_id, version):
+        if not isinstance(map_id, str) or type(version) is not int or version < 1:
+            raise ValueError('请选择地图版本')
+        document = next((document for document in self.maps.list()
+                         if document['id'] == map_id and document['version'] == version), None)
+        if document is None:
+            raise ValueError('地图版本不可用，请重新选择地图')
+        return document
 
     def _map_index(self, versions):
         return [dict(version, template=self._is_template(version)) for version in versions]
@@ -83,6 +101,19 @@ class Workspace:
         path = self.task_queue_path
         return json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
 
+    def _task_bed_locations(self, map_id, version=None):
+        document = max((item for item in self.maps.list(include_archived=version is not None)
+                        if item['id'] == map_id and (version is None or item['version'] == version)),
+                       key=lambda item: item['version'], default=None)
+        return service_beds(document) if document else {}
+
+    def _vacant_task_beds(self, task, locations):
+        beds = task['beds']
+        retained = Counter(int(visit) % len(beds) for visit in task.get('retained_visit_states', {}))
+        remaining = [bed for index, bed in enumerate(beds) if retained[index] < task['count']]
+        vacant = self.census.vacant_services(locations, remaining)
+        return [dict(bed_id=bed, label=label) for bed, label in zip(beds, task['bed_labels']) if bed in vacant]
+
     def save_editor_task(self, data, runner=None):
         created_at = datetime.now(timezone.utc)
         map_id, request_id = data['map_id'], data['request_id']
@@ -105,6 +136,11 @@ class Workspace:
                 if any(old[key] != value for key, value in record.items()):
                     raise ValueError('此保存请求已用于另一份任务内容')
                 return old
+            version = data.get('map_version')
+            locations = service_beds(self.census_map(map_id, version)) if version is not None else self._task_bed_locations(map_id)
+            vacant = self._vacant_task_beds(record, locations)
+            if vacant:
+                raise VacantTaskBeds(vacant)
             state = runner.snapshot() if runner is not None else {}
             self._reconcile_task_publications(records, state)
             self._check_unfinished_bed_conflicts(record, records, state)
@@ -310,7 +346,7 @@ class Workspace:
                     visits[retry_id]['status'] = 'pending'
         return dict(tasks=list(visits.values()),task_specs=specs)
 
-    def editor_tasks(self, map_id, runner):
+    def editor_tasks(self, map_id, runner, map_version=None):
         with self.lock:
             records = self._task_records()
             state = runner.snapshot()
@@ -318,12 +354,16 @@ class Workspace:
             if self._assign_legacy_task_numbers(records):
                 self._write_json(self.task_queue_path, records)
             _, _, visit_states, conflicts = self._task_bed_occupancy(map_id, records, state)
+            version = map_version or (state.get('map_version') if state.get('map_id') == map_id else None)
+            locations = self._task_bed_locations(map_id, version)
             results = []
             for task in records.values():
                 if task['map_id'] != map_id or task['status'] == 'deleted':
                     continue
                 statuses = visit_states.get(task['id'], [])
+                vacant = self._vacant_task_beds(task, locations) if task['status'] in ('queued', 'saved') else []
                 results.append(dict(task, completed=bool(statuses) and all(status == 'completed' for status in statuses),
+                                    vacant_beds=vacant,
                                     visit_states=statuses, bed_conflicts=conflicts.get(task['id'], [])))
             return results
 
@@ -432,7 +472,7 @@ class Workspace:
             tasks = [records.get(task_id) for task_id in dict.fromkeys(ids)]
             if any(task is None or task['map_id'] != state['map_id'] for task in tasks):
                 raise ValueError('所选任务不属于当前地图')
-            tasks = [task for task in tasks if task['status'] == 'saved']
+            tasks = [task for task in tasks if task['status'] in ('saved', 'queued')]
             if not tasks:
                 return {'submitted': 0}
             if sum(task['count'] * len(task['beds']) for task in tasks) > 1000:
@@ -441,6 +481,10 @@ class Workspace:
             blocked = [item for task in tasks for item in conflicts.get(task['id'], [])]
             if blocked:
                 raise TaskBedConflict(blocked)
+            locations = self._task_bed_locations(state['map_id'], state.get('map_version'))
+            vacant = [item for task in tasks for item in self._vacant_task_beds(task, locations)]
+            if vacant:
+                raise VacantTaskBeds(vacant)
             self._submit_editor_tasks(records, tasks, state['run_id'], runner.submit)
             return {'submitted': len(tasks)}
 
@@ -455,8 +499,9 @@ class Workspace:
             if not ready:
                 return
             _, _, _, conflicts = self._task_bed_occupancy(state['map_id'], records, state)
+            locations = self._task_bed_locations(state['map_id'], state.get('map_version'))
             for task in ready:
-                if task['id'] not in conflicts:
+                if task['id'] not in conflicts and not self._vacant_task_beds(task, locations):
                     self._submit_editor_tasks(records, [task], state['run_id'], submit)
 
     def _submit_editor_tasks(self, records, tasks, run_id, submit):

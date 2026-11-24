@@ -46,51 +46,27 @@
   "metrics": {
     "heart_rate": {
       "label": "心率",
-      "unit": "bpm",
-      "decimals": 0,
-      "normal": [60, 100],
-      "critical_below": 50,
-      "critical_above": 110
+      "unit": "bpm"
     },
     "spo2": {
       "label": "血氧饱和度",
-      "unit": "%",
-      "decimals": 1,
-      "normal": [95, 100],
-      "critical_below": 90,
-      "critical_above": 100.0
+      "unit": "%"
     },
     "systolic_bp": {
       "label": "收缩压",
-      "unit": "mmHg",
-      "decimals": 0,
-      "normal": [90, 139],
-      "critical_below": 80,
-      "critical_above": 160
+      "unit": "mmHg"
     },
     "diastolic_bp": {
       "label": "舒张压",
-      "unit": "mmHg",
-      "decimals": 0,
-      "normal": [60, 89],
-      "critical_below": 50,
-      "critical_above": 100
+      "unit": "mmHg"
     },
     "respiratory_rate": {
       "label": "呼吸频率",
-      "unit": "次/分",
-      "decimals": 0,
-      "normal": [16, 20],
-      "critical_below": 12,
-      "critical_above": 24
+      "unit": "次/分"
     },
     "temperature": {
       "label": "体温",
-      "unit": "℃",
-      "decimals": 1,
-      "normal": [36.0, 37.0],
-      "critical_below": 35.0,
-      "critical_above": 38.5
+      "unit": "℃"
     }
   },
   "record_path": "outputs/vitals_records.jsonl"

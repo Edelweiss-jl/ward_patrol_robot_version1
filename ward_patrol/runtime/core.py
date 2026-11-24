@@ -1,6 +1,7 @@
 """Fixed-step runtime shared by HTTP and command-line clients."""
 from copy import deepcopy
 from dataclasses import asdict
+from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
@@ -22,6 +23,8 @@ class Runtime(DualRobotSimulation):
         self.samples = {}
         self.local_sampling = local_sampling
         self.vitals_sampler = None
+        self.bed_census = None
+        self.bed_locations = {}
         self.attempts = {}
         self.applied_commands = set()
         self.outbox = []
@@ -80,14 +83,25 @@ class Runtime(DualRobotSimulation):
                        attempt_id=task.task_id+'-A'+str(self.attempts.get(task.task_id,1)) if task else None,
                        robot_id=robot.robot_id if robot else None, source=source,
                        seq=len(self.samples)+1, sim_time=self.elapsed)
-        info = self.sample_bed_info(bed)
-        if info is not None:
-            status = info.get('bed_status')
-            request['bed_status'] = status if status in ('vacant', 'occupied') else 'unrecorded'
-            patient = info.get('patient')
-            if status == 'occupied' and isinstance(patient, dict):
-                request['profile'] = {key: patient.get(key) for key in ('age', 'diagnosis')}
+        stay_id = None
+        if self.bed_census and bed in self.bed_locations:
+            status, stay_id, profile = self.bed_census.sampling_context(self.bed_locations[bed])
+            request['bed_status'] = status
+            if profile is None:
+                request['vacant'] = True
+            else:
+                request['profile'] = profile
+        else:
+            info = self.sample_bed_info(bed)
+            if info is not None:
+                status = info.get('bed_status')
+                request['bed_status'] = status if status in ('vacant', 'occupied') else 'unrecorded'
+                patient = info.get('patient')
+                if status == 'occupied' and isinstance(patient, dict):
+                    request['profile'] = {key: patient.get(key) for key in ('age', 'diagnosis')}
         self.samples[sample_id] = dict(request=request, accepted=False)
+        if stay_id:
+            self.samples[sample_id].update(stay_id=stay_id, sampled_at=datetime.now(timezone.utc).isoformat())
         self.emit('sample_requested', robot, task, sample_id=sample_id, source=source)
         result = bed_check_without_vitals(request)
         if result is not None:
@@ -113,9 +127,15 @@ class Runtime(DualRobotSimulation):
     def record_sample(self, sample, message, task):
         sample['accepted'] = True
         sample['result'] = deepcopy(message)
-        event = 'vitals_received' if message.get('vitals') else 'bed_checked'
+        event = 'vitals_received' if message.get('vitals') else 'sample_skipped' if sample['request'].get('vacant') else 'bed_checked'
+        patrol_id = getattr(self, 'task_specs', {}).get(message.get('task_id'), {}).get('patrol_id')
+        details = {key: sample[key] for key in ('stay_id', 'sampled_at') if key in sample}
+        if patrol_id:
+            details['patrol_id'] = patrol_id
         self.emit(event, task=task, sample_id=message['sample_id'],
-                  source=sample['request']['source'], payload=message)
+                  source=sample['request']['source'], payload=message, **details)
+        if self.bed_census and event == 'vitals_received':
+            self.bed_census.record_sample(self.events[-1])
 
     def receipt(self, message):
         sample = self.samples.get(message.get('sample_id'))
@@ -123,6 +143,10 @@ class Runtime(DualRobotSimulation):
             self.emit('receipt_unmatched', payload=message)
             return
         request = sample['request']
+        profile = request.get('profile') or {}
+        if profile.get('revision') and message.get('profile') != profile:
+            self.emit('receipt_unmatched', sample_id=message['sample_id'])
+            return
         task = next((t for t in self.tasks if t.task_id == request['task_id']), None)
         if task and (request['attempt_id'] != task.task_id+'-A'+str(self.attempts.get(task.task_id,1)) or task.status == 'cancelled'):
             self.emit('receipt_late', payload=message)
@@ -133,11 +157,10 @@ class Runtime(DualRobotSimulation):
         if task and task.status != 'assigned':
             self.emit('receipt_late', payload=message)
             return
-        status = request.get('bed_status')
+        expected = bed_check_without_vitals(request)
         vitals = message.get('vitals')
-        verdict = message.get('verdict')
-        if status in ('vacant', 'unrecorded'):
-            valid = isinstance(verdict, dict) and verdict.get('status') == status and vitals is None
+        if expected is not None:
+            valid = message.get('verdict') == expected['verdict'] and vitals == expected.get('vitals')
         else:
             valid = isinstance(vitals, dict) and bool(vitals)
         if not valid:
@@ -267,12 +290,15 @@ class Runtime(DualRobotSimulation):
         pass
 
     def snapshot(self):
-        return dict(run_id=self.run_id, step=self.step, elapsed=self.elapsed,
+        state = dict(run_id=self.run_id, step=self.step, elapsed=self.elapsed,
                     started=self.started, paused=self.paused, ended=self.ended, speed=self.speed, tasks=[asdict(t) for t in self.tasks],
                     robots=[dict(id=r.robot_id, xy=r.xy, path=r.path, color=r.color, status=r.status,
                                  task_id=r.task_id) for r in self.robots],
                     beds=deepcopy(self.bed_info), attempts=deepcopy(self.attempts),
                     samples=deepcopy(self.samples), events=deepcopy(self.events))
+        if self.bed_census:
+            state['bed_revisions'] = self.bed_census.revisions(self.bed_locations)
+        return state
 
     def close(self):
         if hasattr(self,'event_file'):

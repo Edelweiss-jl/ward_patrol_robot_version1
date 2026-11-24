@@ -11,6 +11,7 @@ from ward_patrol.maps.geometry import blank_map, DEFAULT_MODELS, Planner, MapSto
 from ward_patrol.runtime.editable import EditableRuntime
 from ward_patrol.runtime.vitals import SimulatedVitals
 from ward_patrol_vitals_mqtt.vitals_mqtt import load_config
+from ward_patrol_web.census import service_beds
 from ward_patrol_web.workspace import TaskBedConflict, Workspace
 
 
@@ -31,6 +32,13 @@ def scene(door=1.):
 def instances(count,model='small'):
     return [dict(id=f'R{i+1}',model_id=model,floor_id='F1',pose=[x,-3,90],parking_id=f'P{i}',enabled=True)
             for i,x in enumerate((-4,-2,2,4)[:count])]
+
+
+def register_task_beds(workspace, document, *services):
+    locations = service_beds(document)
+    for key in {locations[service] for service in services}:
+        workspace.census.change(document, dict(action='register', key=key,
+                                patient=dict(name='仿真患者', age_months=360, sex='unknown')))
 
 
 class Stage2Tests(unittest.TestCase):
@@ -315,12 +323,16 @@ class Stage2Tests(unittest.TestCase):
     def test_task_number_continues_after_reload_and_resets_on_local_date_change(self):
         with tempfile.TemporaryDirectory() as root:
             workspace = Workspace(root)
+            register_task_beds(workspace, workspace.census_map('corridor', 1), 'N1-1', 'S3-2')
+            ring = workspace.census_map('ring', 1)
+            ring_service = next(iter(service_beds(ring)))
+            register_task_beds(workspace, ring, ring_service)
             data = dict(request_id='a'*32, map_id='corridor', beds=['N1-1'], count=1, period=0)
             with patch('ward_patrol_web.workspace.datetime') as clock:
                 clock.now.return_value = datetime(2026, 11, 17, 15, 59, tzinfo=timezone.utc)
                 first = workspace.save_editor_task(data)
                 workspace = Workspace(root)
-                second = workspace.save_editor_task(dict(data, request_id='b'*32, map_id='ring'))
+                second = workspace.save_editor_task(dict(data, request_id='b'*32, map_id='ring', beds=[ring_service]))
                 self.assertEqual((first['id'], second['id']), ('PATROL-20261117-0001', 'PATROL-20261117-0002'))
                 clock.now.return_value = datetime(2026, 11, 17, 16, 0, tzinfo=timezone.utc)
                 self.assertEqual(workspace.save_editor_task(data), first)
@@ -336,6 +348,7 @@ class Stage2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root, patch('ward_patrol_web.workspace.datetime') as clock:
             clock.now.return_value = datetime(2026, 11, 17, 2, 0, tzinfo=timezone.utc)
             workspace = Workspace(root)
+            register_task_beds(workspace, workspace.census_map('corridor', 1), 'N1-1', 'S3-2')
             data = dict(request_id='a'*32, map_id='corridor', beds=['N1-1'], count=1, period=0)
             first = workspace.save_editor_task(data)
             second = workspace.save_editor_task(dict(data, request_id='b'*32, beds=['S3-2']))
@@ -357,6 +370,7 @@ class Stage2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             workspace = Workspace(root)
             workspace.maps.save(document)
+            register_task_beds(workspace, document, 'S0', second_bed['id'])
             base = dict(map_id=document['id'], count=1, period=0)
             first = workspace.save_editor_task(dict(base, request_id='a'*32, beds=['S0','S1']))
             duplicate = dict(base, request_id='b'*32, beds=['S0'], bed_labels=['一楼 / B03'])
@@ -432,6 +446,7 @@ class Stage2Tests(unittest.TestCase):
     def test_permanent_delete_removes_finished_task_from_saved_and_archive_lists(self):
         with tempfile.TemporaryDirectory() as root:
             workspace = Workspace(root)
+            register_task_beds(workspace, workspace.census_map('corridor', 1), 'N1-1')
             data = dict(map_id='corridor',request_id='a'*32,beds=['N1-1'],notes='remove this',
                         count=1,period=0)
             record = workspace.save_editor_task(data)
@@ -460,6 +475,7 @@ class Stage2Tests(unittest.TestCase):
     def test_deleted_patrol_is_removed_from_live_and_replay_results(self):
         with tempfile.TemporaryDirectory() as root:
             workspace = Workspace(root)
+            register_task_beds(workspace, workspace.census_map('corridor', 1), 'N1-1')
             data = dict(map_id='corridor',request_id='a'*32,beds=['N1-1'],count=1,period=0)
             record = workspace.save_editor_task(data)
             run_id = 'd'*32
@@ -484,6 +500,14 @@ class Stage2Tests(unittest.TestCase):
                       dict(event='vitals_received',task_id='T1',sample_id='remove'),
                       dict(event='vitals_received',task_id='T2',sample_id='other'),
                       dict(event='vitals_received',sample_id='manual')]
+            bed_key = service_beds(workspace.census_map('corridor', 1))['N1-1']
+            revision = workspace.census.records[bed_key]['revision']
+            for event in events[-3:]:
+                sample_id = event['sample_id']
+                event['payload'] = dict(sample_id=sample_id, task_id=event.get('task_id'),
+                                        source='task' if event.get('task_id') else 'manual',
+                                        profile=dict(revision=revision), verdict=dict(status='normal'),
+                                        vitals=samples[sample_id]['result']['vitals'])
             last = dict(first,tasks=[dict(pending,status='completed'),other],samples=samples)
             state = dict(last,events=events)
             runner = type('Runner', (), {'snapshot': lambda self: state})()
@@ -518,6 +542,7 @@ class Stage2Tests(unittest.TestCase):
                 self.assertEqual(frame['robot_queues'],{'R1':['T2']})
                 self.assertNotIn('T1',frame['task_specs'])
             self.assertEqual(set(visible['samples']),{'manual','other'})
+            self.assertEqual({item['sample_id'] for item in workspace.census.history(bed_key, revision)}, {'manual','other'})
             self.assertEqual(visible['samples'],replay['snapshots'][-1]['samples'])
             self.assertEqual(workspace.read_run(unrelated)['snapshots'][0]['samples'],samples)
             self.assertEqual(state['samples'],samples)
@@ -528,6 +553,10 @@ class Stage2Tests(unittest.TestCase):
             clock.now.return_value = datetime(2026,11,23,2,0,tzinfo=timezone.utc)
             workspace = Workspace(root)
             document = workspace.maps.save(scene(3))
+            register_task_beds(workspace, document, 'S0')
+            ring = workspace.census_map('ring', 1)
+            ring_service = next(iter(service_beds(ring)))
+            register_task_beds(workspace, ring, ring_service)
             data = dict(map_id=document['id'],beds=['S0'],count=1,period=0)
             records = workspace._task_records()
             for number in (1,2):
@@ -535,7 +564,7 @@ class Stage2Tests(unittest.TestCase):
                 records[task_id] = dict(id=task_id,map_id='corridor',status='deleted')
             workspace._write_json(workspace.task_queue_path,records)
             first = workspace.save_editor_task(dict(data,request_id='a'*32))
-            second = workspace.save_editor_task(dict(data,request_id='b'*32,map_id='ring',beds=['N1-2']))
+            second = workspace.save_editor_task(dict(data,request_id='b'*32,map_id='ring',beds=[ring_service]))
             self.assertEqual([first['display_number'],second['display_number']],
                              ['PATROL-20261123-0001','PATROL-20261123-0002'])
             self.assertEqual([first['id'],second['id']],['PATROL-20261123-0003','PATROL-20261123-0004'])
@@ -552,6 +581,7 @@ class Stage2Tests(unittest.TestCase):
     def test_conflicting_legacy_queue_records_are_flagged_and_not_submitted_together(self):
         with tempfile.TemporaryDirectory() as root:
             workspace = Workspace(root)
+            register_task_beds(workspace, workspace.census_map('corridor', 1), 'N1-1')
             data = dict(request_id='a'*32, map_id='corridor', beds=['N1-1'],
                         bed_labels=['一楼 / N1-1'], count=1, period=0)
             first = workspace.save_editor_task(data)

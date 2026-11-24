@@ -65,7 +65,7 @@ def vitals_message(bed_id, vitals, scenario="routine", robot_id=None, seq=0, sim
 
 
 def status_message(bed_id, verdict, robot_id=None, seq=0, sim_time=None):
-    """判定结果：status / abnormal / color / reasons，供仿真端给床位换色。"""
+    """判定结果与评分依据，供监控和回放使用。"""
     msg = {
         "event": "bed_status",
         "bed_id": str(bed_id),
@@ -78,6 +78,7 @@ def status_message(bed_id, verdict, robot_id=None, seq=0, sim_time=None):
         "scenario": verdict.get("scenario", "routine"),
         "ts": now_iso(),
     }
+    msg.update({key: verdict[key] for key in ('findings', 'rule', 'source', 'score') if key in verdict})
     if robot_id is not None:
         msg["robot_id"] = str(robot_id)
     if sim_time is not None:

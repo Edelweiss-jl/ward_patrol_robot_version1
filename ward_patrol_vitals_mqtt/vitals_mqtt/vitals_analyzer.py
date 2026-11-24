@@ -1,75 +1,74 @@
-"""体征异常判定：逐项比对正常区间，给出等级、原因与床位颜色。
-
-等级：normal（正常）/ warning（预警）/ critical（危急）。
-warning 与 critical 都算异常，床位标红（预警亮红、危急深红）。
-"""
-
-from __future__ import annotations
-
-from . import protocol
+"""Evidence-based interpretation of simulated bedside observations."""
 from .config import color_for
-
-
-def _fmt(spec, value):
-    d = int(spec.get("decimals", 0))
-    return f"{value:.{d}f}" if d else str(int(round(value)))
+from .protocol import ABNORMAL_LEVELS
+from .vitals_reference import (
+    NEWS2_BANDS, NEWS2_SOURCE, PEDIATRIC_SOURCE, PULSE_SOURCE,
+    news2_points, pediatric_ranges, resting_pulse_range, valid_reading,
+)
 
 
 class VitalsAnalyzer:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.metrics = cfg["metrics"]
+        self.metrics = cfg['metrics']
 
-    def classify(self, value, spec):
-        """单项判定：超出危急界为 critical，超出正常界为 warning。"""
-        if value is None:
-            return "normal"
-        lo, hi = float(spec["normal"][0]), float(spec["normal"][1])
-        if value < float(spec["critical_below"]) or value > float(spec["critical_above"]):
-            return "critical"
-        if value < lo or value > hi:
-            return "warning"
-        return "normal"
-
-    @staticmethod
-    def _combine(level_a, level_b):
-        return level_a if protocol.LEVEL_ORDER[level_a] >= protocol.LEVEL_ORDER[level_b] else level_b
-
-    def analyze(self, vitals, scenario="routine"):
-        """返回判定结果字典，可直接交给 protocol.status_message。"""
-        findings = []
-        reasons = []
-        status = "normal"
-
-        for key, spec in self.metrics.items():
-            value = vitals.get(key)
-            level = self.classify(value, spec)
-            lo, hi = spec["normal"]
-            item = {
-                "metric": key,
-                "label": spec.get("label", key),
-                "value": value,
-                "unit": spec.get("unit", ""),
-                "normal": [lo, hi],
-                "status": level,
-            }
+    def analyze(self, vitals, scenario='routine', profile=None):
+        profile = profile or {}
+        pediatric = pediatric_ranges(profile)
+        pregnant = profile.get('pregnant', False)
+        rule, source = ('pregnancy_unassessed', None) if pregnant else (
+            ('pediatric_reference', PEDIATRIC_SOURCE) if pediatric else ('news2', NEWS2_SOURCE))
+        required = () if pregnant else (pediatric if pediatric else NEWS2_BANDS)
+        findings, reasons, missing = [], [], []
+        scores = []
+        pulse_range = resting_pulse_range(profile)
+        for key in dict.fromkeys((*self.metrics, *required)):
+            spec = self.metrics.get(key, {})
+            raw = vitals.get(key)
+            value = raw if valid_reading(key, raw) else None
+            label, unit = spec.get('label', key), spec.get('unit', '')
+            item = dict(metric=key, label=label, value=value, unit=unit)
+            if key == 'heart_rate' and pulse_range:
+                item.update(reference=list(pulse_range), reference_source=PULSE_SOURCE)
+                if value is not None:
+                    item['outside_reference'] = not pulse_range[0] <= value <= pulse_range[1]
+            if key in required:
+                if value is None:
+                    missing.append(label)
+                elif pediatric:
+                    lo, hi = pediatric[key]
+                    item['reference'] = [lo, hi]
+                    if not lo <= value <= hi:
+                        reasons.append(f'{label} {value:g}{unit} 超出该年龄参考范围 {lo}–{hi}')
+                else:
+                    points = news2_points(key, value)
+                    item['points'] = points
+                    scores.append(points)
+                    if points:
+                        reasons.append(f'{label} {value:g}{unit}（{points} 分）')
             findings.append(item)
-            status = self._combine(status, level)
-            if level != "normal":
-                shown = _fmt(spec, value) if value is not None else "-"
-                direction = "高于" if value is not None and value > hi else "低于"
-                tag = "危急" if level == "critical" else "预警"
-                reasons.append(
-                    f"{spec.get('label', key)} {shown}{spec.get('unit', '')}"
-                    f"{direction}正常范围 {lo}~{hi}（{tag}）"
-                )
 
-        return {
-            "status": status,
-            "abnormal": status in protocol.ABNORMAL_LEVELS,
-            "color": color_for(self.cfg, status),
-            "reasons": reasons,
-            "findings": findings,
-            "vitals": dict(vitals),
-            "scenario": scenario,
-        }
+        score = None
+        if pregnant:
+            status = 'unassessed'
+            reasons.append('妊娠期仿真资料，需采用产科专用评估')
+        elif pediatric:
+            status = 'warning' if reasons else 'unassessed' if missing else 'normal'
+        else:
+            total = sum(scores)
+            score = None if missing else total
+            if total >= 7:
+                status = 'critical'
+            elif total >= 5 or 3 in scores:
+                status = 'warning'
+            elif missing:
+                status = 'unassessed'
+            else:
+                status = 'observe' if total else 'normal'
+        if missing:
+            reasons.append('有效测量缺失：' + '、'.join(missing))
+
+        return dict(status=status, abnormal=status in ABNORMAL_LEVELS,
+                    color=color_for(self.cfg, status), reasons=reasons,
+                    findings=findings, vitals={item['metric']: item['value'] for item in findings},
+                    scenario=scenario, rule=rule, source=source, score=score)

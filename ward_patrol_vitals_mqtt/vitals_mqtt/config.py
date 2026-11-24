@@ -1,8 +1,4 @@
-"""配置加载：broker、主题、体征阈值。
-
-配置只从 JSON 读取，便于仿真端与服务端使用同一份阈值；
-缺失字段回落到 DEFAULT，避免改一处配置就跑不起来。
-"""
+"""配置加载：broker、主题、仿真采样参数和体征显示单位。"""
 
 from __future__ import annotations
 
@@ -26,6 +22,8 @@ DEFAULT = {
     "qos": {"arrival": 1, "vitals": 0, "status": 1, "alert": 1, "liveness": 0},
     "bed": {
         "color_normal": [0.16, 0.72, 0.36, 1],
+        "color_observe": [0.56, 0.44, 0.12, 1],
+        "color_unassessed": [0.38, 0.45, 0.51, 1],
         "color_warning": [1.0, 0.35, 0.20, 1],
         "color_critical": [0.80, 0.02, 0.06, 1],
     },
@@ -60,9 +58,8 @@ def load_config(path=None):
     elif path:
         raise FileNotFoundError(f"config not found: {target}")
     cfg = _merge(DEFAULT, raw)
-    # 阈值是判定的核心，缺失时给出明确报错，而不是静默放行所有数据。
     if not cfg.get("metrics"):
-        raise ValueError(f"no metrics thresholds in config: {target}")
+        raise ValueError(f"missing vitals definitions in config: {target}")
     cfg["_path"] = str(target)
     return cfg
 

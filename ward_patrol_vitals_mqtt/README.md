@@ -1,7 +1,24 @@
-# 体征模块迁移来源
+# 仿真体征采样与评估
 
-生成器、分级器、配置、MQTT 封装及原有单元测试来自 E:/python汇报/ygy 的 b7ac967da88cd56e216ab9971385cc6a4a3e1867。
+## 床位资料与采样
 
-阶段 1 的采样服务入口为 `python -m ward_patrol.runtime.mqtt`，该入口为每次采样保存 sample_id、任务和执行尝试，并缓存重复请求的结果。旧 service.py 保留来源实现供对照。
+床位管理使用当前工作区的地图。相同地图的各版本共用楼层和床位标识未变的入住记录。独立复制出的地图拥有自己的记录。姓名、诊断、科室和备注保存在工作区的 `bed_census.json` 中，默认工作区为 `outputs`。旧版 `outputs/runs/beds.json` 是巡查备注，可查阅后在床位管理中补录完整入住资料。该功能供仿真演示，请使用虚构患者资料。
 
-启动和验收见 docs/acceptance/ACCEPTANCE_stage1.md。
+Web 床位采样仅发送年龄（月数）、性别、妊娠状态和资料版本号。床位管理从运行日志自动读取本次入住的历次采样，显示采样时间、来源、任务、机器人、体征及当时的判定。修改患者资料会保留本次入住已有的记录，新采样使用修改后的资料。Web 重启时从 `runs/*/events.jsonl` 恢复可关联的历史。旧版样本按匹配的资料版本关联，只有仿真时间的记录会显示仿真秒数。出院后，新入住患者使用独立记录。空床或待入住床位可继续执行到站任务，事件中记录 `sample_skipped`。独立 CLI 可从旧版床位资料读取年龄和诊断来生成演示样本，未登记床位仅记录到站巡查。
+
+MQTT 采样服务通过 `python -m ward_patrol.runtime.mqtt` 启动，并用 sample_id 复用同一次采样的历史结果。Web 使用 `--no-mqtt` 时复用同一个采样器。 [启动与验收](../docs/acceptance/ACCEPTANCE_stage1.md)
+
+## 规则与文献
+
+| 人群和场景 | 本项目的仿真处理 |
+| --- | --- |
+| 满 16 岁、非妊娠 | 按 NEWS2 对呼吸频率、血氧（量表 1）、收缩压、心率和体温评分。仿真设定为室内空气和意识清醒，这两项各计 0 分。 |
+| 未满 16 岁 | 取 RCH 表中小于或等于当前月龄的最近一档，逐项对照收缩压、心率和呼吸频率。越界提示复核。此路径采用参考范围，无综合分数。 |
+| 妊娠期 | 显示测量值，标记未评估并提示采用产科评估。 |
+| 满 16 岁的静息脉搏参考 | 按 NHANES 的年龄及性别组显示 P5–P95。未记录性别时用同年龄组的合并样本。该参考用于生成常规成人模拟心率和提供解释，NEWS2 预警分数沿用原表。 |
+
+成人评分在比较前将体温四舍五入至一位小数，血氧、心率、呼吸和收缩压取整。0 分显示正常，1–4 分显示低分观察，单项 3 分或总分 5–6 显示预警，总分达到 7 显示危急。缺失或无效数据会提示测量缺失，已有值触发的预警仍会显示。舒张压保留在测量结果中。仿真场景可以指定异常强度，最后等级由规则从测量值算出。
+
+- Royal College of Physicians（2017），NEWS2 原始评分表和总分分级。 [执行摘要与评分表](https://www.rcplondon.ac.uk/media/ctulqqbn/news2-executive-summary_0.pdf)
+- Royal Children’s Hospital Melbourne（2023），患病儿童收缩压、心率和呼吸频率参考范围。最低年龄档适用于足月新生儿。 [儿科参考表](https://www.rch.org.au/clinicalguide/guideline_index/Normal_Ranges_for_Physiological_Variables/)
+- Ostchega 等（2011），美国 NHANES 1999–2008 静息脉搏人群百分位。 [NCHS 报告第 1–3 表](https://www.cdc.gov/nchs/data/nhsr/nhsr041.pdf)

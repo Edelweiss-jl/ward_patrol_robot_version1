@@ -36,6 +36,9 @@ class SamplingService:
             self.results[sample_id] = result
         if any(result.get(key) != request.get(key) for key in ('run_id','task_id','attempt_id','bed_id','robot_id','source')):
             return
+        profile = request.get('profile') or {}
+        if profile.get('revision') and result.get('profile') != profile:
+            return
         self.bus.publish(self.config['topics']['status'], result, qos=1)
 
 

@@ -6,8 +6,9 @@ import math
 from types import SimpleNamespace
 import pybullet as p
 
-from ward_patrol.maps.geometry import Planner, compile_floor, footprint, validate
+from ward_patrol.maps.geometry import Planner, charger_placement_error, compile_floor, footprint, validate
 from ward_patrol.runtime.core import Runtime, DT
+from ward_patrol.runtime.charging import ChargingExecution
 from ward_patrol.runtime.coverage import FloorCoverage
 from ward_patrol.runtime.dispatch_policy import DispatchPolicy
 from ward_patrol.runtime.elevator_risk import ElevatorRisk
@@ -20,7 +21,7 @@ from ward_patrol.simulation.dual_robot_demo import RobotState
 
 
 # Simulated percentage points consumed per meter actually driven.
-BATTERY_USE_PER_METER = 0.1
+BATTERY_USE_PER_METER = 0.005
 DEFAULT_BATTERY_PERCENT = 100
 DEFAULT_SAFETY_PERCENT = 20
 VEHICLE_COLORS = {'red': 'da4651', 'yellow': 'ecb629', 'blue': '3279cf',
@@ -104,11 +105,16 @@ def validate_setup(document, models, instances):
         parking = next((o for o in floor['objects'] if o['id']==instance.get('parking_id') and o['kind']=='parking'), None)
         if parking is None:
             raise ValueError('实例必须引用本楼层的停车点')
+        if 'charger' in parking:
+            raise ValueError(f"{instance['id']} 的固定停车点已设为共享充电桩")
         if not instance.get('enabled', True):
             continue
         planner = Planner(floor, model)
         if not planner.free(pose[:2]):
             raise ValueError(f"{instance['id']} 初始位姿不可通行")
+        if any('charger' in point and planner.inside(pose[:2], point, planner.radius)
+               for point in floor['objects']):
+            raise ValueError(f"{instance['id']} 初始位置不得占用共享充电桩")
         if any(item['kind']=='single_lane' and planner.inside(pose[:2],item,planner.radius) for item in floor['objects']):
             raise ValueError(f"{instance['id']} 初始位置必须设在窄通道外")
         for previous, radius in active:
@@ -117,6 +123,14 @@ def validate_setup(document, models, instances):
         active.append((instance, planner.radius))
     if not active:
         raise ValueError('至少启用一台机器人')
+    active_models = {vehicle['model_id'] for vehicle, _ in active}
+    for floor in floors.values():
+        chargers = [point for point in floor['objects'] if 'charger' in point]
+        if chargers:
+            planners = [Planner(floor, known_models[identity]) for identity in active_models]
+            for point in chargers:
+                if all(charger_placement_error(floor, point, planner) for planner in planners):
+                    raise ValueError(f"{floor['name']} / {point['charger']['number']} 无法供已启用车型安全对接")
     return True
 
 
@@ -157,8 +171,8 @@ def normalize_patrol_fields(record):
     return dict(beds=beds, count=count, period=period, task=spec)
 
 
-class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanning, PerceptionExecution,
-                      ElevatorExecution, PassageExecution, Runtime):
+class EditableRuntime(ChargingExecution, ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanning,
+                      PerceptionExecution, ElevatorExecution, PassageExecution, Runtime):
     sim_dt = DT
     battery_use_per_meter = BATTERY_USE_PER_METER
     def __init__(self, document, models, instances, output='outputs/runs', gui=False, policy=None, local_sampling=False):
@@ -213,6 +227,7 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
             self.headings[robot.robot_id] = math.radians(instance['pose'][2])
         self.configure_elevators()
         self.configure_passages()
+        self.configure_charging()
         self.configure_perception()
         self.configure_planning()
         self.configure_floor_coverage()
@@ -317,6 +332,11 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
                 raise ValueError('恢复任务的历史床位进度无效')
             skipped = set(skipped)
             remaining = [(index,beds[index%len(beds)]) for index in range(size) if index not in skipped]
+            if self.bed_census:
+                vacant = self.bed_census.vacant_services(self.bed_locations, [bed for _, bed in remaining])
+                if vacant:
+                    names = [self.services[bed][1].get('name') or bed for bed in beds if bed in vacant]
+                    raise ValueError('空床不能加入巡查队列：' + '、'.join(names))
             total += len(remaining)
             if total > 1000:
                 raise ValueError('单次最多发布 1000 个床位巡检项')
@@ -378,8 +398,8 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
 
     def available_battery(self, robot):
         charge, reserve = battery_limits(self.robot_instances[robot.robot_id])
-        charge += self.recharged.get(robot.robot_id,0.)-robot.distance*BATTERY_USE_PER_METER
-        return max(0., min(100.,charge)), reserve
+        charge += self.recharged.get(robot.robot_id, 0.) + self.charge_credit.get(robot.robot_id, 0.)
+        return max(0., min(100., charge-robot.distance*self.battery_use_per_meter)), reserve
 
     def _set_dispatch_wait(self, task, reason, event='task_waiting'):
         if self.wait_reasons.get(task.task_id) != reason:
@@ -426,6 +446,10 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
                         math.dist(robot.xy,task.goal)/model['speed'],robot.robot_id)
 
             for robot in sorted(self.robots,key=candidate_order):
+                if self.unavailable_for_patrol(robot.robot_id):
+                    reasons.append(robot.robot_id+' 正在执行充电流程')
+                    plan_failed = bool(planned)
+                    continue
                 instance = self.robot_instances[robot.robot_id]
                 model = self.models[instance['model_id']]
                 if planned and planned['robot_id']!=robot.robot_id:
@@ -469,11 +493,12 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
                     required = self.parking_requirement(robot,model,floor_id,task.goal,distance,charge,reserve,
                                                         allow_top_up=can_charge)
                     if required>charge+1e-9:
-                        if can_charge and math.isfinite(required):
-                            top_ups.append((required-charge,robot.robot_id))
-                            reasons.append(f'{robot.robot_id} 等待补电至 {required:.1f}% 后可执行并返停')
-                        else:
-                            reasons.append(f'{robot.robot_id} 执行后无电量充足且安全可达的空闲停车点')
+                        if not deferred and math.isfinite(required):
+                            if self.chargers and charge < self.charge_target(reserve)-1:
+                                self.charge_requested.add(robot.robot_id)
+                            elif can_charge:
+                                top_ups.append((required-charge,robot.robot_id))
+                        reasons.append(f'{robot.robot_id} 电量不足，无法安全完成巡检及返停或回充')
                         plan_failed = bool(planned)
                         continue
                     finish = available+cost+service
@@ -538,7 +563,11 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
             return
         if self.advance_passage_yield(robot,task):
             return
+        if not self.charge_transit_safe(robot):
+            return
         if self.advance_elevator_route(robot,task):
+            return
+        if self.advance_charge_job(robot):
             return
         if robot.robot_id in self.parking_moves:
             self.advance_parking_move(robot,task)
@@ -622,6 +651,7 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
     def tick(self):
         self.elapsed=self.step*DT
         self.tick_perception()
+        self.schedule_charging()
         if self.elapsed-self.last_dispatch>=.5:
             self.dispatch()
             self.last_dispatch=self.elapsed
@@ -647,6 +677,8 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
         state['elevators']=[lift.snapshot() for lift in self.elevators.values()]
         state['passages']=[gate.snapshot() for gate in self.passages.values()]
         state['parking_resources']=self.parking_snapshot()
+        state['chargers']=self.charging_snapshot()
+        state['charging_waits']=dict(self.charge_waits)
         state['perception']=self.perception_snapshot()
         state['dynamic_obstacles']=[{key:data[key] for key in ('id','kind','floor_id','xy','size')}
                                     for data in self.scene_obstacles.values()]
@@ -657,6 +689,9 @@ class EditableRuntime(ParkingExecution, FloorCoverage, ElevatorRisk, FleetPlanni
             instance=self.robot_instances[robot['id']]
             charge, reserve = self.available_battery(actual)
             robot.update(battery_percent=round(charge,2),safety_battery_percent=reserve)
+            job = self.charge_jobs.get(robot['id'])
+            if job:
+                robot['charger'] = dict(floor_id=job['dock'][0], id=job['dock'][1], phase=job['phase'])
             robot.update(floor_id=self.robot_floors[robot['id']],model_id=instance['model_id'],yaw=self.headings[robot['id']],speed=self.velocities[robot['id']])
             robot.update(self.robot_parking_snapshot(robot['id']))
             request = self.elevator_requests.get(robot['id'])

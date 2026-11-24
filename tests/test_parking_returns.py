@@ -34,7 +34,7 @@ class ParkingReturns(unittest.TestCase):
         document['version'] = 1
         document['floors'][0]['objects'] = [point('P','parking',-4),point('A','service',0)]
         fleet = [dict(id='R1',model_id='small',floor_id='F1',pose=[-4,0,0],parking_id='P',
-                      battery_percent=60.6,safety_battery_percent=60)]
+                      battery_percent=60.03,safety_battery_percent=60)]
         with TemporaryDirectory() as root:
             core = EditableRuntime(document,DEFAULT_MODELS,fleet,output=root)
             try:
@@ -44,7 +44,7 @@ class ParkingReturns(unittest.TestCase):
                 self.assertEqual(task.status,'pending')
                 self.assertEqual(core.by_robot['R1'].status,'charging')
                 advance_until(core,lambda: task.status=='assigned')
-                self.assertGreaterEqual(core.available_battery(core.by_robot['R1'])[0],60.8-1e-9)
+                self.assertGreaterEqual(core.available_battery(core.by_robot['R1'])[0],60.04-1e-9)
                 advance_until(core,lambda: any(e['event']=='parking_arrived' for e in core.events))
             finally:
                 core.close()
@@ -62,7 +62,7 @@ class ParkingReturns(unittest.TestCase):
                 core.close()
 
     def test_dispatch_prefers_another_robot_over_waiting_for_a_top_up(self):
-        document,models,fleet = local_scene(60.5)
+        document,models,fleet = local_scene(60.025)
         fleet[0]['safety_battery_percent'] = 60
         with TemporaryDirectory() as root:
             core = EditableRuntime(document,models,fleet,output=root)
@@ -77,7 +77,7 @@ class ParkingReturns(unittest.TestCase):
     def test_batch_parking_protects_the_only_reachable_spot(self):
         document,models,fleet = local_scene()
         document['floors'][0]['objects'] = [point('P1','parking',-4),point('P2','parking',0)]
-        fleet[1].update(pose=[0,0,0],battery_percent=20.15)
+        fleet[1].update(pose=[0,0,0],battery_percent=20.0075)
         with TemporaryDirectory() as root:
             core = EditableRuntime(document,models,fleet,output=root)
             try:

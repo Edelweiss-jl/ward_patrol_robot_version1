@@ -22,6 +22,9 @@
 .model-tooltip span:empty{display:none}
 .model-tooltip .model-size{color:#c3e0e2;font-size:12px;margin-bottom:4px}
 .model-tooltip .model-controls{font-size:12px;color:#d3e7e8;margin-top:5px}
+.model-tooltip.bed-hover{pointer-events:auto}
+.bed-hover a{display:inline-block;margin:5px 0 0;color:#c9fff0;text-underline-offset:3px}
+.bed-hover #bedHoverStatus{color:#d3e7e8;font-size:12px}
 
 .floor-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0;background:#edf4f3;padding:5px;border-radius:7px}
 .floor-tabs{position:relative;display:flex;gap:4px;overflow-x:auto;min-width:0;flex:1 1 180px}
@@ -59,7 +62,8 @@
 #taskEditor,#modelEditor{border-top:1px solid #d2dee0;padding-top:8px;margin:8px 0}
 #modelFeedback:empty{display:none}
 #taskPickModes [aria-pressed=true]{background:#167364;color:white}
-#taskFloorPicker{width:min(420px,calc(100vw - 30px));max-height:85dvh;overflow:auto;padding:20px;border:1px solid #c3d8ce;border-radius:14px;color:inherit}
+#taskFloorPicker,#chargerSettings{width:min(420px,calc(100vw - 30px));max-height:85dvh;overflow:auto;padding:20px;border:1px solid #c3d8ce;border-radius:14px;color:inherit}
+#chargerSettingsStatus{white-space:pre-line;color:#80521b}
 #taskFloorChoices label{display:flex;gap:8px;margin:8px 0}
 #taskFeedback{white-space:pre-line}
 #taskFeedback.task-feedback-warning{background:#fff8dd;border:1px solid #e8ce78;border-radius:6px;padding:8px 10px;color:#654816;overflow-wrap:anywhere}
@@ -86,7 +90,7 @@
 <link rel="stylesheet" href="/workbench.css">
 <body class="workbench">
 <a class="skip-link" href="#workspaceMain">跳到工作区</a>
-<header><h1>病区巡查工作台</h1><div class="header-actions"><button id="openGuide" type="button">使用引导</button><a href="/monitor">简易监控 ↗</a></div></header>
+<header><h1>病区巡查工作台</h1><div class="header-actions"><button id="openGuide" type="button">使用引导</button><a id="bedCensusLink" href="/beds">床位管理</a><a href="/monitor">简易监控 ↗</a></div></header>
 <div class="app-shell">
 <nav class="workspace-nav" aria-label="工作台导航">
 <p class="nav-caption">工作流程</p>
@@ -138,7 +142,17 @@
 </form>
 <div class="bar"><select id="floor" hidden></select><label>宽 m <input id="floorWidth" type="number" min="1" max="100"></label><label>高 m <input id="floorHeight" type="number" min="1" max="100"></label><button id="resizeFloor">修改尺寸</button></div>
 <div class="bar"><select id="tool" aria-label="更多建图类型"><option value="select">选择 / 拖动</option><option value="wall">墙</option><option value="door">门</option><option value="bed">床</option><option value="furniture">家具</option><option value="parking">停车点</option><option value="service">服务点</option><option value="elevator">电梯入口</option><option value="waiting">候梯点</option><option value="exit">出梯区域</option><option value="forbidden">禁行区</option><option value="one_way">单向区域</option></select><label>吸附 m <input id="snap" type="number" value="0.1" min="0.01" step="0.05"></label><button id="rotate">旋转 15°</button><button id="deleteObject" title="删除选中物品（Delete）" aria-keyshortcuts="Delete">删除</button><button id="undo" title="撤销上一步（Ctrl+Z）" aria-keyshortcuts="Control+Z">撤销</button></div>
-<div class="build-tools"><button id="drawFloor" class="primary">▱ 拖框创建楼层范围</button><button type="button" id="drawRoom">▱ 框建病房</button><button id="drawWall">╱ 拖线画隔墙</button><button id="selectObject">↖ 移动与调整</button><button type="button" id="boxSelect">框选物件</button><button type="button" id="copyObjects" disabled>复制所选</button><span id="floorArea"></span></div>
+<div class="build-tools"><button id="drawFloor" class="primary">▱ 拖框创建楼层范围</button><button type="button" id="drawRoom">▱ 框建病房</button><button id="drawWall">╱ 拖线画隔墙</button><button id="selectObject">↖ 移动与调整</button><button type="button" id="boxSelect">框选物件</button><button type="button" id="copyObjects" disabled>复制所选</button><button type="button" id="openChargerSettings" aria-haspopup="dialog" aria-controls="chargerSettings">充电桩设置</button><span id="floorArea"></span></div>
+<dialog id="chargerSettings" aria-labelledby="chargerSettingsTitle">
+  <h2 id="chargerSettingsTitle">充电桩设置</h2>
+  <form id="chargerSettingsForm">
+    <label>本层停车点 <select id="chargerParkingPoint" required></select></label>
+    <div id="chargerSettingsFields"></div>
+    <p id="chargerSettingsStatus" role="status"></p>
+    <div class="bar"><button type="submit" id="applyChargerSettings" class="primary">应用到地图</button>
+    <button type="button" id="closeChargerSettings">关闭</button></div>
+  </form>
+</dialog>
 <div id="catalog" aria-label="病区物品栏"></div>
 <p class="muted">将物品卡片拖到画布。门拖到墙上会自动开口；病床自带床旁服务点。选中物品可拖动，拖右下角调整大小，拖上方圆点旋转。</p>
 <div class="floor-toolbar">
@@ -166,6 +180,10 @@
 <span aria-hidden="true">⟳</span> 拖动旋转
 </button>
 <canvas id="canvas" width="900" height="520"></canvas>
+<aside id="bedHover" class="model-tooltip bed-hover" aria-label="床位患者摘要" hidden>
+  <strong id="bedHoverName"></strong><span id="bedHoverStatus"></span><span id="bedHoverPatient"></span>
+  <span id="bedHoverVitals"></span><a id="bedHoverLink" href="/beds">查看床位详情 ↗</a>
+</aside>
 <div class="canvas-floor" id="canvasFloor" role="status"></div>
 <div id="wallDoorTools" class="wall-door-tools" role="dialog" aria-labelledby="wallDoorLocation" hidden>
 <strong id="wallDoorLocation">是否开辟门洞？</strong>
@@ -182,7 +200,7 @@
 <p id="wallStatus" class="wall-status" role="status"></p><p id="viewportHelp" class="muted viewport-help">左键编辑物件。点「移动画布」后可拖动平移。</p>
 <div><label>底图 <input id="background" type="file" accept="image/*" style="width:190px"></label><label>标定距离 m <input id="calibrationDistance" type="number" value="5" min="0.01"></label><button id="calibrate">依次点底图上两点标定</button><button id="clearBackground">清除底图</button></div>
 </section>
-<section id="runtimePanel"><h2>巡查状态</h2><div class="bar" id="runtimeActions"><button id="preview">车型通行预览</button><button id="start" class="primary">准备巡查</button><button id="pause">暂停</button><button id="resume">继续</button><button id="endRun" type="button" disabled>结束</button><label>倍速 <select id="speed"><option>1</option><option>2</option><option>4</option><option>8</option></select></label></div><div id="runtime" class="status"></div><p id="fleetBattery" class="muted"></p><p id="floorCoverage" class="muted"></p><pre id="previewResult"></pre><details id="eventDetails"><summary>事件记录与导出</summary><pre id="events"></pre><a href="/api/csv/events" download="events.csv">下载当前运行事件 CSV</a></details></section>
+<section id="runtimePanel"><h2>巡查状态</h2><div class="bar" id="runtimeActions"><button id="preview">车型通行预览</button><button id="start" class="primary">准备巡查</button><button id="pause">暂停</button><button id="resume">继续</button><button id="endRun" type="button" disabled>结束</button><label>倍速 <select id="speed"><option>1</option><option>2</option><option>4</option><option>8</option></select></label></div><div id="runtime" class="status"></div><p id="fleetBattery" class="muted"></p><p id="chargingStatus" class="muted"></p><p id="floorCoverage" class="muted"></p><pre id="previewResult"></pre><details id="eventDetails"><summary>事件记录与导出</summary><pre id="events"></pre><a href="/api/csv/events" download="events.csv">下载当前运行事件 CSV</a></details></section>
 <section id="replayPanel"><h2>选择历史运行</h2><p class="muted">加载后可切换楼层、拖动时间轴查看当时的车辆和任务。离开回放分区会返回实时地图。</p><label for="runs">运行记录</label><select id="runs"></select><label class="muted"><input id="replayIncludeEmpty" type="checkbox"> 包含未开始的记录</label><p id="replayRecordsStatus" class="muted" role="status"></p><button id="refreshRuns">刷新记录</button><button id="loadReplay">加载回放</button><button id="exitReplay">返回实时</button><label class="replay-time-label" for="replaySlider">回放时间轴</label><input id="replaySlider" type="range" min="0" max="0" value="0"><div id="replayInfo" role="status"></div></section>
 <div id="dispatchPolicyPanel">
 <p id="dispatchPolicyUnavailable" class="muted">请先在「车队配置」中点击「准备当前地图」。准备完成后即可调整调度偏好。</p>
@@ -263,7 +281,7 @@
 </dialog>
 </section>
 <section id="tasksPanel">
-<h2>巡查任务</h2><p class="muted">先选床位并保存，再到任务队列勾选发布。下发后自动分配车辆和路线。</p>
+<h2>巡查任务</h2><p class="muted">地图保存后即可创建任务。车队准备就绪后，在任务队列勾选并发布。</p>
 <div class="bar">
 <button id="newTask" type="button" aria-expanded="false" aria-controls="taskEditor">创建任务</button>
 <button id="savedTaskQueueButton" type="button" aria-expanded="false" aria-controls="savedTaskQueue">任务队列（0 项）</button>

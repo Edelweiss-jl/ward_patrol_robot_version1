@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>床位管理 · 病区巡查工作台</title>
+<link rel="stylesheet" href="/console.css">
+<link rel="stylesheet" href="/beds.css">
+<script defer src="/vitals.js"></script>
+<script defer src="/bed-map.js"></script>
+<script defer src="/beds.js"></script>
+</head>
+<body class="bed-page">
+<header>
+  <h1>床位管理</h1>
+  <a href="/">返回巡查工作台</a>
+</header>
+<main>
+  <section class="bed-filters" aria-label="筛选床位">
+    <label>地图版本<select id="bedMap"></select></label>
+    <label>楼层<select id="bedFloor"><option value="">全部楼层</option></select></label>
+    <label>床位状态<select id="occupancy"><option value="">全部床位</option><option value="vacant">空床</option><option value="pending">已登记待入住</option><option value="occupied">已入住</option></select></label>
+    <button id="refreshBeds" type="button">刷新</button>
+  </section>
+  <p id="bedStatus" role="status" aria-live="polite">正在加载床位…</p>
+  <div class="bed-columns">
+    <div class="bed-overview">
+    <section class="bed-map-panel" aria-labelledby="bedMapHeading">
+      <h2 id="bedMapHeading">病区楼层平面图</h2>
+      <div id="bedFloorTabs" class="bed-floor-tabs" role="group" aria-label="切换楼层"></div>
+      <div class="bed-map-legend" aria-label="床位状态图例">
+        <span class="occupancy vacant">空床</span>
+        <span class="occupancy pending">已登记待入住</span>
+        <span class="occupancy occupied">已入住</span>
+      </div>
+      <div class="bed-map-scroll">
+        <div class="bed-map-stage" id="bedMapStage" hidden>
+          <canvas width="960" height="600" aria-hidden="true"></canvas>
+          <div class="bed-map-markers"></div>
+        </div>
+      </div>
+      <p id="mapNoBeds" hidden>此楼层没有床位。</p>
+    </section>
+    <section class="bed-list" aria-labelledby="bedsHeading">
+      <h2 id="bedsHeading">床位列表</h2>
+      <p id="bedCounts"></p>
+      <div class="table-scroll"><table>
+        <thead><tr><th scope="col">床位</th><th scope="col">楼层</th><th scope="col">状态</th><th scope="col">患者</th><th scope="col">操作</th></tr></thead>
+        <tbody id="bedRows"></tbody>
+      </table></div>
+      <p id="emptyBeds" hidden>当前筛选条件下没有床位。</p>
+    </section>
+    </div>
+    <section class="bed-details" aria-labelledby="bedHeading">
+      <h2 id="bedHeading">床位详情</h2>
+      <p id="chooseBed">在地图或列表中选择床位。</p>
+      <div id="patientView" hidden>
+        <dl id="patientFields"></dl>
+        <div class="bed-actions">
+          <button id="editPatient" type="button">修改资料</button>
+          <button id="checkInPatient" class="primary" type="button" hidden>确认入住</button>
+          <button id="cancelRegistration" type="button" hidden>取消登记</button>
+          <button id="dischargePatient" type="button" class="discharge">办理出院</button>
+        </div>
+        <section class="assessment" id="bedHistory" aria-labelledby="assessmentHeading">
+          <h3 id="assessmentHeading">巡检体征记录</h3>
+          <label id="samplePicker" hidden>选择采样记录<select id="bedSamples"></select></label>
+          <p id="bedHistoryStatus" role="status"></p>
+          <div id="assessment"></div>
+        </section>
+      </div>
+      <form id="patientForm" hidden autocomplete="off">
+        <label>姓名<input name="name" required maxlength="80"></label>
+        <div class="patient-grid">
+          <label>年龄<input name="age" type="number" required min="1" max="130" step="1"></label>
+          <label>年龄单位<select name="ageUnit"><option value="year">岁</option><option value="month">月龄（未满一岁）</option></select></label>
+          <label>性别<select name="sex"><option value="unknown">未记录</option><option value="female">女</option><option value="male">男</option></select></label>
+          <label>科室<input name="department" maxlength="80"></label>
+        </div>
+        <label class="check-label"><input name="pregnant" type="checkbox">妊娠期</label>
+        <label>诊断信息<textarea name="diagnosis" maxlength="1000" rows="3"></textarea></label>
+        <label>备注<textarea name="notes" maxlength="1000" rows="2"></textarea></label>
+        <div class="bed-actions">
+          <button id="savePatient" type="submit" class="primary">登记待入住</button>
+          <button id="cancelPatient" type="button">取消</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</main>
+</body>
+</html>

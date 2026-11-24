@@ -13,7 +13,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from ward_patrol.runtime.core import Runtime, DT
 from ward_patrol.runtime.editable import EditableRuntime
-from ward_patrol_web.workspace import TaskBedConflict, Workspace
+from ward_patrol_web.workspace import TaskBedConflict, VacantTaskBeds, Workspace
+from ward_patrol_web.census import OccupancyConflict, service_beds
+from ward_patrol.maps.geometry import legacy_map
 from ward_patrol.runtime.mqtt import SamplingLink
 
 
@@ -30,11 +32,17 @@ class SimRunner(threading.Thread):
         self.incoming = Queue()
         self.workspace = workspace
 
+    def bind_census(self, core, document):
+        if self.workspace:
+            core.bed_census = self.workspace.census
+            core.bed_locations = service_beds(document)
+
     def run(self):
         core = link = None
         try:
             output = self.workspace.root/'runs' if self.workspace else 'outputs/runs'
             core = Runtime(output=output, gui=self.gui, local_sampling=not self.mqtt)
+            self.bind_census(core, legacy_map('corridor'))
             core.started = False
             self.core = core
             ward = core.ward
@@ -55,6 +63,7 @@ class SimRunner(threading.Thread):
                         if core is not None:
                             core.close()
                         core = EditableRuntime(**command['setup'], output=output, gui=self.gui, local_sampling=not self.mqtt)
+                        self.bind_census(core, core.document)
                         core.started = False
                         self.core = core
                         link = SamplingLink(core) if self.mqtt else None
@@ -122,7 +131,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length',str(len(body)))
         path = self.path.partition('?')[0]
         if path in ('/api/editor/tasks', '/api/maps', '/api/maps/manage', '/api/archives/tasks',
-                    '/api/state', '/api/replay') or path.startswith('/api/csv/'):
+                    '/api/state', '/api/replay', '/api/bed-census', '/api/bed-census/history') or path.startswith('/api/csv/'):
             self.send_header('Cache-Control', 'no-store')
         self.end_headers()
         self.wfile.write(body)
@@ -130,6 +139,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             url = urlparse(self.path)
+            if url.path == '/api/bed-census/history':
+                query = parse_qs(url.query)
+                self.reply(self.server.workspace.census.history(
+                    query.get('key', [''])[0], query.get('revision', [''])[0]))
+                return
+            if url.path == '/api/bed-census':
+                query = parse_qs(url.query)
+                workspace = self.server.workspace
+                document = workspace.census_map(query.get('map_id', [''])[0], int(query.get('version', ['0'])[0]))
+                self.reply(workspace.census.list(document, summary=query.get('summary') == ['1']))
+                return
             if url.path == '/api/run-elevators':
                 run_id = parse_qs(url.query).get('run_id', [''])[0]
                 if len(run_id)!=32 or any(char not in '0123456789abcdef' for char in run_id):
@@ -138,18 +158,23 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(path.read_bytes(), 'application/x-ndjson; charset=utf-8')
                 return
             if url.path == '/api/editor/tasks':
-                map_id = parse_qs(url.query).get('map_id', [''])[0]
-                self.reply(self.server.workspace.editor_tasks(map_id, self.server.runner))
+                query = parse_qs(url.query)
+                map_id = query.get('map_id', [''])[0]
+                version = int(query.get('map_version', ['0'])[0]) or None
+                self.reply(self.server.workspace.editor_tasks(map_id, self.server.runner, version))
                 return
             data = self.server.workspace.get(self.path)
             if data is not None:
                 self.reply(data)
                 return
+        except OccupancyConflict as exc:
+            self.reply({'error': str(exc)}, status=409)
+            return
         except (ValueError, KeyError, OSError) as exc:
             self.reply({'error': str(exc)}, status=400)
             return
-        pages = {'/':'editor.html','/editor':'editor.html','/monitor':'index.html'}
-        if url.path in pages or url.path in ('/editor.js', '/furnishing.js', '/elevators.js', '/console.css', '/workbench.js', '/workbench.css', '/vitals.js'):
+        pages = {'/':'editor.html','/editor':'editor.html','/monitor':'index.html','/beds':'beds.html'}
+        if url.path in pages or url.path in ('/editor.js', '/furnishing.js', '/elevators.js', '/console.css', '/workbench.js', '/workbench.css', '/vitals.js', '/beds.js', '/beds.css', '/bed-map.js'):
             name = pages.get(url.path,url.path[1:])
             mime = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css'}[Path(name).suffix] + '; charset=utf-8'
             self.reply(Path(__file__).with_name('static').joinpath(name).read_bytes(), mime)
@@ -195,6 +220,13 @@ class Handler(BaseHTTPRequestHandler):
             if length > 16000000:
                 raise ValueError('请求大小超过 16 MB')
             command = json.loads(self.rfile.read(length))
+            if not isinstance(command, dict):
+                raise ValueError('请求应为 JSON 对象')
+            if self.path == '/api/bed-census':
+                workspace = self.server.workspace
+                document = workspace.census_map(command.get('map_id'), command.get('version'))
+                self.reply(workspace.census.change(document, command))
+                return
             if self.path == '/api/editor/tasks':
                 action = command.get('action')
                 if action == 'save':
@@ -227,8 +259,10 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('本次巡查已结束，请重新准备巡查')
             command_id=self.server.runner.submit(command)
             self.reply({'command_id':command_id},status=202)
-        except TaskBedConflict as exc:
+        except (TaskBedConflict, VacantTaskBeds) as exc:
             self.reply({'error': str(exc), 'conflicts': exc.conflicts}, status=409)
+        except OccupancyConflict as exc:
+            self.reply({'error': str(exc)}, status=409)
         except (ValueError,KeyError,TypeError) as exc:
             self.reply({'error':str(exc)},status=400)
         except OSError:

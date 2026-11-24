@@ -7,6 +7,8 @@ import time
 import urllib.request
 from ward_patrol.runtime.core import Runtime
 from ward_patrol.runtime.mqtt import SamplingLink
+from ward_patrol.maps.geometry import legacy_map
+from ward_patrol_web.census import service_beds
 
 
 def main():
@@ -79,7 +81,7 @@ def main():
         handle=(output/'web.log').open('w',encoding='utf-8')
         handles.append(handle)
         processes.append(subprocess.Popen([sys.executable,'-u','-m','ward_patrol_web.server','--port','8011',
-                                           '--workspace',str(web_workspace)],stdout=handle,stderr=handle))
+                                           '--workspace', str(web_workspace)],stdout=handle,stderr=handle))
         time.sleep(3)
         def get(path):
             return urllib.request.urlopen('http://127.0.0.1:8011'+path,timeout=5)
@@ -109,8 +111,17 @@ def main():
             rates.append(step()-start)
         assert 1.6 < rates[1]/rates[0] < 2.4,rates
         post(dict(action='set_speed',speed=4))
-        post(dict(action='update_bed',bed='N1-1',fields=occupied))
-        post(dict(action='create_task',bed='N1-1'))
+        bed_key = service_beds(legacy_map('corridor'))['N1-1']
+        admission = dict(action='admit', map_id='corridor', version=1, key=bed_key,
+                         patient=dict(name='仿真患者', age_months=96, sex='female'))
+        request = urllib.request.Request('http://127.0.0.1:8011/api/bed-census',
+                                         data=json.dumps(admission).encode(),
+                                         headers={'Content-Type':'application/json'})
+        with urllib.request.urlopen(request,timeout=5) as response:
+            revision = json.load(response)['patient']['revision']
+        command=urllib.request.Request('http://127.0.0.1:8011/api/cmd',data=b'{"action":"create_task","bed":"N1-1"}',headers={'Content-Type':'application/json'})
+        with urllib.request.urlopen(command,timeout=5) as response:
+            assert response.status==202
         deadline=time.monotonic()+30
         while time.monotonic()<deadline:
             with get('/api/state') as response:
@@ -119,6 +130,10 @@ def main():
             time.sleep(.2)
         else:raise AssertionError('Web task incomplete')
         assert any(event['event']=='vitals_received' for event in state['events'])
+        sample = next(sample for sample in state['samples'].values() if sample['accepted'])
+        assert sample['request']['profile']['revision'] == revision
+        assert sample['result']['verdict']['rule'] == 'pediatric_reference'
+        assert 'name' not in sample['request']['profile']
         (output/'result.json').write_text(json.dumps(dict(passed=True,core_run=run,web_run=state['run_id'],sequence=sequence,steps_per_second=rates,cli_run=str(cli_run),cli_sequences=cli_sequences),indent=2),encoding='utf-8')
         print('PASS',output/'result.json')
     finally:
